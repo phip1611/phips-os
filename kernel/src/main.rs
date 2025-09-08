@@ -26,4 +26,25 @@
 
 mod panic_handler;
 
-fn main() {}
+/// Entry into the kernel.
+///
+/// Set's up the stack before jumping into the Rust code.
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn kernel_entry() -> ! {
+    core::arch::naked_asm!(
+        // todo stack aufsetzen
+
+        // Jump zum Kernel
+        "cli",
+        "hlt",
+        "jmp main",
+    )
+}
+
+#[unsafe(no_mangle)]
+fn main() -> ! {
+    loop {
+        core::hint::spin_loop();
+    }
+}

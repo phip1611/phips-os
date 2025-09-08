@@ -1,5 +1,4 @@
-/* Symbol from assembly boot code. */
-ENTRY(entry_multiboot)
+ENTRY(kernel_entry)
 
 /*
  * FORMAT/ARCH
