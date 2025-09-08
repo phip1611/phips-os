@@ -1,14 +1,10 @@
 [package]
-name = "uefi-loader-lib"
+name = "util"
 version = "0.1.0"
 license.workspace = true
 publish.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
-
 [dependencies]
-anyhow = { workspace = true }
-uefi = { workspace = true, features = ["alloc"] }
-util = { path = "../util" }
-log = "0.4.28"
+log = { workspace = true }

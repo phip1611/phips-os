@@ -56,7 +56,8 @@ uefi-loader:
 check:
 	cargo check \
 		-p kernel-lib \
-		-p uefi-loader-lib
+		-p uefi-loader-lib \
+		-p util
 	cargo check -p kernel $(KERNEL_COMMON_CARGO_ARGS)
 	cargo check -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
 
@@ -65,7 +66,8 @@ check:
 doc:
 	cargo doc --no-deps --document-private-items \
 		-p kernel-lib \
-		-p uefi-loader-lib
+		-p uefi-loader-lib \
+		-p util
 
 .PHONY: fmt
 fmt:
@@ -77,7 +79,8 @@ fmt:
 test:
 	cargo test \
 		-p kernel-lib \
-		-p uefi-loader-lib
+		-p uefi-loader-lib \
+		-p util
 
 
 .PHONY: qemu_integrationtest

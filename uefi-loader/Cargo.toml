@@ -9,4 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+log = { workspace = true }
 uefi = { workspace = true, features = ["alloc"] }
+uefi-loader-lib = { path = "../uefi-loader-lib"}
+util = { path = "../util" }

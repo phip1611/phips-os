@@ -1,5 +1,6 @@
 //! Library for generic and unit-testable functionality of the kernel.
 
+#![no_std]
 #![deny(
     clippy::all,
     clippy::cargo,
