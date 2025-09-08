@@ -1,7 +1,6 @@
 //! Library for generic and unit-testable functionality of the uefi-loader.
 
 #![no_std]
-
 #![deny(
     clippy::all,
     clippy::cargo,

@@ -16,6 +16,7 @@ rust-version = "1.89.0"
 
 
 [workspace.dependencies]
+anyhow = { version = "1.0.99", default-features = false }
 uefi = { version = "0.35.0", default-features = false }
 
 

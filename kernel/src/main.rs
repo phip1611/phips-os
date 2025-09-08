@@ -2,7 +2,6 @@
 
 #![no_std]
 #![no_main]
-
 #![deny(
     clippy::all,
     clippy::cargo,
