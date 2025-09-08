@@ -28,7 +28,7 @@
 mod logger;
 
 use std::os::uefi as uefi_std;
-use uefi::{ Handle};
+use uefi::Handle;
 
 /// Performs the necessary setup code for the [`uefi`] crate.
 fn setup_uefi_crate() {

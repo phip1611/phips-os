@@ -7,4 +7,5 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+bit_ops = { workspace = true }
 log = { workspace = true }
