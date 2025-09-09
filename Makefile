@@ -8,6 +8,8 @@ PROFILE_DIR := $(if $(filter dev,$(CARGO_PROFILE)),debug,$(CARGO_PROFILE))
 OVMF ?= /usr/share/ovmf/OVMF_CODE.fd
 # values: false,true
 QEMU_DISPLAY ?= true
+# values: false, true
+QEMU_KVM ?= false
 
 ##########################
 # INTERNAL VARIABLES
@@ -22,7 +24,10 @@ UEFI_LOADER_COMMON_CARGO_ARGS = \
 KERNEL_ARTIFACT = target/x86_64-unknown-kernel/$(PROFILE_DIR)/kernel
 UEFI_LOADER_ARTIFACT = target/x86_64-unknown-uefi/$(PROFILE_DIR)/uefi-loader.efi
 QEMU_BOOT_VOL = $(ARTIFACTS_DIR)/boot
+QEMU_ACCEL_ARG = $(if $(filter true,$(QEMU_KVM)),kvm,$(if $(filter false,$(QEMU_KVM)),tcg))
+QEMU_CPU_ARG = $(if $(filter true,$(QEMU_KVM)),host,$(if $(filter false,$(QEMU_KVM)),qemu64))
 QEMU_DISPLAY_ARG = $(if $(filter true,$(QEMU_DISPLAY)),gtk,$(if $(filter false,$(QEMU_DISPLAY)),none))
+QEMU_MONITOR_ARG = $(if $(filter true,$(QEMU_DISPLAY)),vc,$(if $(filter false,$(QEMU_DISPLAY)),none))
 
 .PHONY: default
 default: build
@@ -85,18 +90,20 @@ test:
 
 .PHONY: qemu_integrationtest
 qemu_integrationtest: | boot-vol
+	# We don't use KVM here as QEMU better allows to debug issues.
 	qemu-system-x86_64 \
 		-bios $(OVMF) \
-		-cpu host \
+		-cpu $(QEMU_CPU_ARG) \
 		-display $(QEMU_DISPLAY_ARG) \
 		-drive "format=raw,file=fat:rw:$(QEMU_BOOT_VOL)" \
 		-m 512M \
-		-machine q35,accel=kvm \
-		-monitor vc \
+		-machine q35,accel=$(QEMU_ACCEL_ARG) \
+		-monitor $(QEMU_MONITOR_ARG) \
 		-no-reboot \
 		-nodefaults \
 		-smp 4 \
 		-vga std
+		# -d int
 
 
 .PHONY: run

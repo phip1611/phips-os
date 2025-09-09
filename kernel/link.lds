@@ -34,12 +34,12 @@ SECTIONS {
     /*
      * All symbols from the high-level Rust code.
      */
-    .text LINK_ADDR_RX :
+    .text LINK_ADDR_RX : ALIGN(2M) /* TODO down to 4K align again: do it in loader instead */
     {
         *(.text .text.*)
     } : rx
 
-    .rodata LINK_ADDR_RO :
+    .rodata LINK_ADDR_RO : ALIGN(2M)
     {
         *(.rodata .rodata.*)
     } : ro
@@ -49,7 +49,7 @@ SECTIONS {
      * makes it easier for the loader to load our kernel as the ELF's segments
      * already will contain all needed memory once loaded into memory.
      */
-    .bss LINK_ADDR_RW :
+    .bss LINK_ADDR_RW : ALIGN(2M)
     {
         *(COMMON)
         *(.bss .bss.*)

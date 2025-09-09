@@ -27,8 +27,8 @@
 
 mod logger;
 
-use std::os::uefi as uefi_std;
 use log::error;
+use std::os::uefi as uefi_std;
 use uefi::Handle;
 
 /// Performs the necessary setup code for the [`uefi`] crate.
@@ -57,9 +57,6 @@ pub unsafe extern "C" fn jump_to_kernel_trampoline() -> ! {
     core::arch::naked_asm!(
         ".balign 8",
         "mov %rcx, %cr3",
-        // TODO until here it works, so the new page tables must be fine
-        "cli",
-        "hlt",
         "jmp *%rdx",
         "ud2",
         options(att_syntax)

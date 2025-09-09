@@ -268,10 +268,7 @@ pub fn map_address_step(
         index,
         phys_dest
     );
-    debug!(
-        "  write={}, hugepage={}",
-        flags.write, flags.hugepage
-    );
+    debug!("  write={}, hugepage={}", flags.write, flags.hugepage);
     let entry = PageTableEntry::new(phys_dest, flags);
     phys_src.0[index] = entry;
 }

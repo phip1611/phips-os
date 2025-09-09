@@ -25,21 +25,23 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use std::arch::asm;
-use std::mem::ManuallyDrop;
-use std::ops::Deref;
-use std::ops::DerefMut;
 use elf::ElfBytes;
+use elf::abi::PT_LOAD;
 use elf::endian::{AnyEndian, LittleEndian};
 use log::{debug, info};
+use std::arch::asm;
+use std::mem::ManuallyDrop;
 use std::num::NonZero;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::ptr::NonNull;
-use elf::abi::PT_LOAD;
 use uefi::boot::{AllocateType, MemoryType, PAGE_SIZE};
 use uefi::fs::FileSystem;
 use uefi::{CStr16, cstr16};
 use util::paging;
-use util::paging::{Page, PageTable, PageTableEntry, PhysMappingDest, VirtAddress, map_address_step, PAGE_MASK};
+use util::paging::{
+    PAGE_MASK, Page, PageTable, PageTableEntry, PhysMappingDest, VirtAddress, map_address_step,
+};
 
 /// The path where we expect the kernel ELF to be.
 const KERNEL_PATH: &CStr16 = cstr16!("kernel.elf64");
@@ -105,7 +107,10 @@ fn realloc_align_up_2mib(
 /// - 1x Level 3
 /// - 1x kernel RX+RW+RO (2 MiB huge pages)
 /// - 1x trampoline
-fn setup_page_tables(elf_bytes: &[u8], trampoline_addr: u64) -> anyhow::Result<u64 /* addr of pml4 */> {
+fn setup_page_tables(
+    elf_bytes: &[u8],
+    trampoline_addr: u64,
+) -> anyhow::Result<u64 /* addr of pml4 */> {
     let mut pt_l4 = ManuallyDrop::new(Box::new(PageTable::ZERO));
     let mut pt_l3 = ManuallyDrop::new(Box::new(PageTable::ZERO));
     let mut pt_l2 = ManuallyDrop::new(Box::new(PageTable::ZERO));
@@ -141,20 +146,42 @@ fn setup_page_tables(elf_bytes: &[u8], trampoline_addr: u64) -> anyhow::Result<u
 
     // segment specific setup: huge page mappings for each segment
     {
-        for (i, segment) in segments.iter().filter(|segment| segment.p_type == elf::abi::PT_LOAD).enumerate() {
+        for (i, segment) in segments
+            .iter()
+            .filter(|segment| segment.p_type == elf::abi::PT_LOAD)
+            .enumerate()
+        {
             // check if we can do proper simple 2 MiB mapping
             assert_eq!(segment.p_filesz, segment.p_memsz);
-            assert!(segment.p_filesz <= 0x200000 /* 2 MiB */);
-            assert_eq!(segment.p_vaddr % 0x200000 /* 2 MiB */, 0);
+            assert!(
+                segment.p_filesz <= 0x200000, /* 2 MiB */
+                "memsize should match filesize"
+            );
+            assert_eq!(
+                segment.p_vaddr % 0x200000, /* 2 MiB */
+                0,
+                "{} should be huge-page aligned",
+                segment.p_vaddr
+            );
 
-            let addr = elf_bytes.as_ptr() as u64 + segment.p_offset;
+            let phys_addr = elf_bytes.as_ptr() as u64 + segment.p_offset;
+            assert!(
+                phys_addr % 0x200000 /* 2 MiB */ == 0,
+                "{phys_addr} should be huge-page aligned"
+            );
+
             let write = segment.p_flags & elf::abi::PF_W != 0;
             let execute = segment.p_flags & elf::abi::PF_X != 0;
-            debug!("Mapping LOAD segment #{}", i + 1);
+            debug!(
+                "Mapping LOAD segment #{} (execute={}, write={})",
+                i + 1,
+                execute,
+                write
+            );
             map_address_step(
                 VirtAddress(segment.p_vaddr),
                 pt_l2.deref_mut(),
-                PhysMappingDest::Addr(addr),
+                PhysMappingDest::Addr(phys_addr),
                 2,
                 write,
                 true,
@@ -215,7 +242,6 @@ fn setup_page_tables(elf_bytes: &[u8], trampoline_addr: u64) -> anyhow::Result<u
             false,
             false,
         );
-
     }
 
     Ok(pt_l4.as_page().as_ptr() as u64)
@@ -231,6 +257,8 @@ fn setup_page_tables(elf_bytes: &[u8], trampoline_addr: u64) -> anyhow::Result<u
 /// 1. Jump to trampoline; hand-off to kernel
 pub fn main(trampoline_addr: u64) -> anyhow::Result<()> {
     let kernel = load_kernel_elf_from_disk()?;
+    // TODO this is useless; instead I need a 2mib allocation per LOAD segment
+
     let (kernel_allocation, idx_begin, idx_end) = realloc_align_up_2mib(kernel);
     let kernel: &[u8] = &kernel_allocation[idx_begin..idx_end];
 
@@ -245,10 +273,7 @@ pub fn main(trampoline_addr: u64) -> anyhow::Result<()> {
         kernel_allocation.as_ptr(),
         unsafe { kernel_allocation.as_ptr().add(kernel_allocation.len()) }
     );
-    debug!(
-        "  relocated to   : {:#?} (2 MiB aligned)",
-        kernel.as_ptr(),
-    );
+    debug!("  relocated to   : {:#?} (2 MiB aligned)", kernel.as_ptr(),);
 
     let pml4_addr: u64 = setup_page_tables(kernel, trampoline_addr)?;
 
