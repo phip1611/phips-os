@@ -28,6 +28,7 @@
 mod logger;
 
 use std::os::uefi as uefi_std;
+use log::error;
 use uefi::Handle;
 
 /// Performs the necessary setup code for the [`uefi`] crate.
@@ -44,10 +45,35 @@ fn setup_uefi_crate() {
     }
 }
 
+/// Trampoline in UEFI loader to jump to kernel.
+///
+/// This is the only part of the loader that will be mapped in the initial page
+/// tables of the loader. It is aligned to `8` bytes to prevent its
+/// instructions from crossing a page boundary. The `n` (`8`) must be less or
+/// equal to the size of the function.
+#[unsafe(naked)]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn jump_to_kernel_trampoline() -> ! {
+    core::arch::naked_asm!(
+        ".balign 8",
+        "mov %rcx, %cr3",
+        // TODO until here it works, so the new page tables must be fine
+        "cli",
+        "hlt",
+        "jmp *%rdx",
+        "ud2",
+        options(att_syntax)
+    )
+}
+
 fn main() -> ! {
     setup_uefi_crate();
     logger::init();
-    uefi_loader_lib::main().unwrap();
+    std::panic::set_hook(Box::new(|panic_info| {
+        error!("PANIC: {panic_info}");
+    }));
+    let tramponline_addr = jump_to_kernel_trampoline as u64;
+    uefi_loader_lib::main(tramponline_addr).unwrap();
     loop {
         core::hint::spin_loop();
     }

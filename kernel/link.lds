@@ -44,15 +44,20 @@ SECTIONS {
         *(.rodata .rodata.*)
     } : ro
 
-    .data : /* Link + Load Addr auto increment */
-    {
-        *(.data .data.*)
-    } : rw
-
+    /*
+     * By having .bss before .data, we enforce that filesize == memsize. This
+     * makes it easier for the loader to load our kernel as the ELF's segments
+     * already will contain all needed memory once loaded into memory.
+     */
     .bss LINK_ADDR_RW :
     {
         *(COMMON)
         *(.bss .bss.*)
+    } : rw
+
+    .data : /* Link + Load Addr auto increment */
+    {
+        *(.data .data.*)
     } : rw
 
     .note : {

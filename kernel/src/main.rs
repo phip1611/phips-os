@@ -24,6 +24,8 @@
 #![deny(missing_debug_implementations)]
 #![deny(rustdoc::all)]
 
+use log::info;
+
 mod panic_handler;
 
 /// Entry into the kernel.
@@ -36,14 +38,20 @@ pub unsafe extern "C" fn kernel_entry() -> ! {
         // todo stack aufsetzen
 
         // Jump zum Kernel
+        "mov $0xdeadbeef, %rax",
         "cli",
         "hlt",
         "jmp main",
+        "ud2",
+        options(att_syntax)
     )
 }
 
 #[unsafe(no_mangle)]
 fn main() -> ! {
+    let mut data = core::hint::black_box([1, 2, 3, 4]);
+    data[3] = 7;
+    info!("Hello world from kernel: {:?}", data);
     loop {
         core::hint::spin_loop();
     }

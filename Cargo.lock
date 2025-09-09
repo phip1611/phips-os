@@ -46,6 +46,7 @@ name = "kernel"
 version = "0.1.0"
 dependencies = [
  "kernel-lib",
+ "log",
  "util",
 ]
 

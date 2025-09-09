@@ -25,16 +25,21 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
+use std::arch::asm;
+use std::mem::ManuallyDrop;
+use std::ops::Deref;
+use std::ops::DerefMut;
+use elf::ElfBytes;
+use elf::endian::{AnyEndian, LittleEndian};
 use log::{debug, info};
 use std::num::NonZero;
 use std::ptr::NonNull;
-use elf::ElfBytes;
-use elf::endian::{AnyEndian, LittleEndian};
+use elf::abi::PT_LOAD;
 use uefi::boot::{AllocateType, MemoryType, PAGE_SIZE};
 use uefi::fs::FileSystem;
 use uefi::{CStr16, cstr16};
 use util::paging;
-use util::paging::{Page, PageTable, PageTableEntry, VirtAddress};
+use util::paging::{Page, PageTable, PageTableEntry, PhysMappingDest, VirtAddress, map_address_step, PAGE_MASK};
 
 /// The path where we expect the kernel ELF to be.
 const KERNEL_PATH: &CStr16 = cstr16!("kernel.elf64");
@@ -91,37 +96,129 @@ fn realloc_align_up_2mib(
     }
 }
 
-
-
-/// Prepares the page-tables for the ELF.
+/// Prepares the page-tables for the kernel in ELF format.
 ///
-/// This uses 4-level page tables.
-fn setup_page_tables(elf_bytes: &[u8]) -> anyhow::Result<NonZero<u8>> {
-    /// Number of page tables:
-    /// - 1x Level 4 (root/PML4)
-    /// - 1x Level 3
-    /// - 1x kernel RX+RW+RO (2 MiB huge pages)
-    /// - 1x trampoline
-    const AMOUNT_PAGE_TABLES: usize = 4;
+/// This uses x86_64 4-level page tables.
+///
+/// Number of page tables:
+/// - 1x Level 4 (root/PML4)
+/// - 1x Level 3
+/// - 1x kernel RX+RW+RO (2 MiB huge pages)
+/// - 1x trampoline
+fn setup_page_tables(elf_bytes: &[u8], trampoline_addr: u64) -> anyhow::Result<u64 /* addr of pml4 */> {
+    let mut pt_l4 = ManuallyDrop::new(Box::new(PageTable::ZERO));
+    let mut pt_l3 = ManuallyDrop::new(Box::new(PageTable::ZERO));
+    let mut pt_l2 = ManuallyDrop::new(Box::new(PageTable::ZERO));
 
     let elf: ElfBytes<LittleEndian> = elf::ElfBytes::<LittleEndian>::minimal_parse(elf_bytes)?;
-    for segment in elf.segments().expect("should have program headers") {
-        segment.
+    let segments = elf.segments().expect("should have program headers");
+    let first_segment = segments.iter().next().expect("should have program header");
+    let vaddr = VirtAddress(first_segment.p_vaddr);
+
+    // generic setup
+    {
+        // map l4 -> l3
+        map_address_step(
+            vaddr,
+            pt_l4.deref_mut(),
+            PhysMappingDest::Page(pt_l3.as_page()),
+            4,
+            true,
+            false,
+            false,
+        );
+        // map l3 -> l2
+        map_address_step(
+            vaddr,
+            pt_l3.deref_mut(),
+            PhysMappingDest::Page(pt_l2.as_page()),
+            3,
+            true,
+            false,
+            false,
+        );
     }
 
-    let mut pages = vec![Page::ZERO; AMOUNT_PAGE_TABLES];
+    // segment specific setup: huge page mappings for each segment
+    {
+        for (i, segment) in segments.iter().filter(|segment| segment.p_type == elf::abi::PT_LOAD).enumerate() {
+            // check if we can do proper simple 2 MiB mapping
+            assert_eq!(segment.p_filesz, segment.p_memsz);
+            assert!(segment.p_filesz <= 0x200000 /* 2 MiB */);
+            assert_eq!(segment.p_vaddr % 0x200000 /* 2 MiB */, 0);
 
-    let pt_l4: &mut Page = &mut pages[0];
-    let pt_l3: &mut Page = &mut pages[1];
-    let pt_l2_kernel: &mut Page = &mut pages[2];
-    let pt_l2_trampoline: &mut Page = &mut pages[3];
+            let addr = elf_bytes.as_ptr() as u64 + segment.p_offset;
+            let write = segment.p_flags & elf::abi::PF_W != 0;
+            let execute = segment.p_flags & elf::abi::PF_X != 0;
+            debug!("Mapping LOAD segment #{}", i + 1);
+            map_address_step(
+                VirtAddress(segment.p_vaddr),
+                pt_l2.deref_mut(),
+                PhysMappingDest::Addr(addr),
+                2,
+                write,
+                true,
+                !execute,
+            );
+        }
+    }
 
-    paging::map_address_step(
+    // trampoline setup
+    {
+        debug!("Mapping trampoline next: at {trampoline_addr:#x}");
+        let trampoline_addr = VirtAddress(trampoline_addr);
+        let l4_index = trampoline_addr.index(4);
+        if pt_l4.0[l4_index].flags().present {
+            panic!("l4 already present; unexpected");
+        }
 
-    );
+        let mut pt_trampoline_l3 = ManuallyDrop::new(Box::new(PageTable::ZERO));
+        map_address_step(
+            trampoline_addr,
+            pt_l4.deref_mut(),
+            PhysMappingDest::Page(pt_trampoline_l3.as_page()),
+            4,
+            false,
+            false,
+            false,
+        );
 
-    //let elf = elf::ElfBytes::elf_bytes()
-    todo!()
+        let mut pt_trampoline_l2 = ManuallyDrop::new(Box::new(PageTable::ZERO));
+        map_address_step(
+            trampoline_addr,
+            pt_trampoline_l3.deref_mut(),
+            PhysMappingDest::Page(pt_trampoline_l2.as_page()),
+            3,
+            false,
+            false,
+            false,
+        );
+
+        let mut pt_trampoline_l1 = ManuallyDrop::new(Box::new(PageTable::ZERO));
+        map_address_step(
+            trampoline_addr,
+            pt_trampoline_l2.deref_mut(),
+            PhysMappingDest::Page(pt_trampoline_l1.as_page()),
+            2,
+            false,
+            false,
+            false,
+        );
+
+        let trampoline_addr_page = trampoline_addr.0 & !(PAGE_MASK as u64);
+        map_address_step(
+            trampoline_addr,
+            pt_trampoline_l1.deref_mut(),
+            PhysMappingDest::Addr(trampoline_addr_page),
+            1,
+            false,
+            false,
+            false,
+        );
+
+    }
+
+    Ok(pt_l4.as_page().as_ptr() as u64)
 }
 
 /// Executes the main logic of the loader.
@@ -132,7 +229,7 @@ fn setup_page_tables(elf_bytes: &[u8]) -> anyhow::Result<NonZero<u8>> {
 /// 1. Prepare trampoline
 /// 1. Exit boot services
 /// 1. Jump to trampoline; hand-off to kernel
-pub fn main() -> anyhow::Result<()> {
+pub fn main(trampoline_addr: u64) -> anyhow::Result<()> {
     let kernel = load_kernel_elf_from_disk()?;
     let (kernel_allocation, idx_begin, idx_end) = realloc_align_up_2mib(kernel);
     let kernel: &[u8] = &kernel_allocation[idx_begin..idx_end];
@@ -149,12 +246,23 @@ pub fn main() -> anyhow::Result<()> {
         unsafe { kernel_allocation.as_ptr().add(kernel_allocation.len()) }
     );
     debug!(
-        "  relocated to   : {:#?} (2 MiB aligned address)",
+        "  relocated to   : {:#?} (2 MiB aligned)",
         kernel.as_ptr(),
     );
 
-    setup_page_tables(kernel)?;
+    let pml4_addr: u64 = setup_page_tables(kernel, trampoline_addr)?;
 
+    unsafe {
+        asm!(
+            "jmp *%rax",
+            "ud2",
+            in("rax") trampoline_addr,
+            in("rcx") pml4_addr,
+            // todo get from ELF
+            in("rdx") 0xffffffff88200000_u64,
+            options(att_syntax, noreturn),
+        );
+    }
     Ok(())
 }
 

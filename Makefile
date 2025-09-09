@@ -89,9 +89,11 @@ qemu_integrationtest: | boot-vol
 		-bios $(OVMF) \
 		-cpu host \
 		-display $(QEMU_DISPLAY_ARG) \
-	    -drive "format=raw,file=fat:rw:$(QEMU_BOOT_VOL)" \
+		-drive "format=raw,file=fat:rw:$(QEMU_BOOT_VOL)" \
 		-m 512M \
 		-machine q35,accel=kvm \
+		-monitor vc \
+		-no-reboot \
 		-nodefaults \
 		-smp 4 \
 		-vga std
