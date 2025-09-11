@@ -8,16 +8,8 @@
     // clippy::restriction,
     // clippy::pedantic
 )]
-// now allow a few rules which are denied by the above statement
-// --> they are ridiculous and not necessary
-#![allow(
-    clippy::suboptimal_flops,
-    clippy::redundant_pub_crate,
-    clippy::fallible_impl_from
-)]
 // I can't do anything about this; fault of the dependencies
 #![allow(clippy::multiple_crate_versions)]
-#![allow(clippy::use_self)]
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 #![deny(rustdoc::all)]
@@ -26,22 +18,14 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use elf::ElfBytes;
-use elf::abi::PT_LOAD;
-use elf::endian::{AnyEndian, LittleEndian};
+use elf::endian::LittleEndian;
 use log::{debug, info};
 use std::arch::asm;
 use std::mem::ManuallyDrop;
-use std::num::NonZero;
-use std::ops::Deref;
 use std::ops::DerefMut;
-use std::ptr::NonNull;
-use uefi::boot::{AllocateType, MemoryType, PAGE_SIZE};
 use uefi::fs::FileSystem;
 use uefi::{CStr16, cstr16};
-use util::paging;
-use util::paging::{
-    PAGE_MASK, Page, PageTable, PageTableEntry, PhysMappingDest, VirtAddress, map_address_step,
-};
+use util::paging::{PAGE_MASK, PageTable, PhysMappingDest, VirtAddress, map_address_step};
 
 /// The path where we expect the kernel ELF to be.
 const KERNEL_PATH: &CStr16 = cstr16!("kernel.elf64");
@@ -166,7 +150,7 @@ fn setup_page_tables(
 
             let phys_addr = elf_bytes.as_ptr() as u64 + segment.p_offset;
             assert!(
-                phys_addr % 0x200000 /* 2 MiB */ == 0,
+                phys_addr.is_multiple_of(0x200000 /* 2 mib */),
                 "{phys_addr} should be huge-page aligned"
             );
 
@@ -288,7 +272,7 @@ pub fn main(trampoline_addr: u64) -> anyhow::Result<()> {
             options(att_syntax, noreturn),
         );
     }
-    Ok(())
+    // unreachable!()
 }
 
 #[cfg(test)]

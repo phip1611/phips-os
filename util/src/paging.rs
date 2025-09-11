@@ -1,6 +1,6 @@
 //! Module for x86_64 4-level paging.
 
-use core::ops::{Range, RangeInclusive};
+use core::ops::RangeInclusive;
 use log::debug;
 
 pub const PAGE_SIZE: usize = 4096;
@@ -91,7 +91,7 @@ impl PageTableEntry {
         value |= phys_addr;
 
         if flags.execute_disable {
-            value |= Self::BIT_EXECUTE_DISABLE as u64;
+            value |= Self::BIT_EXECUTE_DISABLE;
         }
 
         Self(value)

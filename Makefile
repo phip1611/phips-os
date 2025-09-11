@@ -67,6 +67,16 @@ check:
 	cargo check -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
 
 
+.PHONY: clippy
+clippy:
+	cargo clippy --all-targets --all-features \
+		-p kernel-lib \
+		-p uefi-loader-lib \
+		-p util
+	cargo check --all-features -p kernel $(KERNEL_COMMON_CARGO_ARGS)
+	cargo check --all-features -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
+
+
 .PHONY: doc
 doc:
 	cargo doc --no-deps --document-private-items \
