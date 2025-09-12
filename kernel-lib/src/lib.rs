@@ -5,9 +5,7 @@
     clippy::all,
     clippy::cargo,
     clippy::nursery,
-    clippy::must_use_candidate,
-    // clippy::restriction,
-    // clippy::pedantic
+    clippy::must_use_candidate
 )]
 // I can't do anything about this; fault of the dependencies
 #![allow(clippy::multiple_crate_versions)]
