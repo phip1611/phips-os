@@ -8,6 +8,6 @@ rust-version.workspace = true
 
 
 [dependencies]
-kernel-lib = { path = "../kernel-lib"}
-util = { path = "../util" }
+kernel-lib = { path = "../../libs/kernel-lib"}
+util = { path = "../../libs/util" }
 log = "0.4.28"

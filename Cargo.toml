@@ -1,10 +1,10 @@
 [workspace]
 members = [
-  "kernel",
-  "kernel-lib",
-  "uefi-loader",
-  "uefi-loader-lib",
-  "util"
+  "ws/bins/kernel",
+  "ws/libs/kernel-lib",
+  "ws/bins/uefi-loader",
+  "ws/libs/uefi-loader-lib",
+  "ws/libs/util"
 ]
 resolver = "3"
 

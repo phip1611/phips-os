@@ -11,5 +11,5 @@ rust-version.workspace = true
 anyhow = { workspace = true }
 log = { workspace = true }
 uefi = { workspace = true, features = ["alloc"] }
-uefi-loader-lib = { path = "../uefi-loader-lib"}
-util = { path = "../util" }
+uefi-loader-lib = { path = "../../libs/uefi-loader-lib"}
+util = { path = "../../libs/util" }

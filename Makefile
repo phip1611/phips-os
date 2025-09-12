@@ -18,7 +18,7 @@ QEMU_KVM ?= false
 RUSTUP_NIGHTLY_TOOLCHAIN=nightly-2025-09-07
 
 KERNEL_COMMON_CARGO_ARGS = \
-	--target kernel/x86_64-unknown-kernel.json \
+	--target ws/bins/kernel/x86_64-unknown-kernel.json \
 	-Z build-std=core,alloc,compiler_builtins \
 	-Z build-std-features=compiler-builtins-mem
 UEFI_LOADER_COMMON_CARGO_ARGS = \
