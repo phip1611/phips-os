@@ -14,6 +14,9 @@ QEMU_KVM ?= false
 ##########################
 # INTERNAL VARIABLES
 
+# rustc 1.91: nightly needed as some unstable build features are required
+RUSTUP_NIGHTLY_TOOLCHAIN=nightly-2025-09-07
+
 KERNEL_COMMON_CARGO_ARGS = \
 	--target kernel/x86_64-unknown-kernel.json \
 	-Z build-std=core,alloc,compiler_builtins \
@@ -22,12 +25,12 @@ UEFI_LOADER_COMMON_CARGO_ARGS = \
 	--target x86_64-unknown-uefi
 
 KERNEL_ARTIFACT = target/x86_64-unknown-kernel/$(PROFILE_DIR)/kernel
-UEFI_LOADER_ARTIFACT = target/x86_64-unknown-uefi/$(PROFILE_DIR)/uefi-loader.efi
+QEMU_ARG_ACCEL = $(if $(filter true,$(QEMU_KVM)),kvm,$(if $(filter false,$(QEMU_KVM)),tcg))
 QEMU_BOOT_VOL = $(ARTIFACTS_DIR)/boot
-QEMU_ACCEL_ARG = $(if $(filter true,$(QEMU_KVM)),kvm,$(if $(filter false,$(QEMU_KVM)),tcg))
 QEMU_CPU_ARG = $(if $(filter true,$(QEMU_KVM)),host,$(if $(filter false,$(QEMU_KVM)),qemu64))
-QEMU_DISPLAY_ARG = $(if $(filter true,$(QEMU_DISPLAY)),gtk,$(if $(filter false,$(QEMU_DISPLAY)),none))
-QEMU_MONITOR_ARG = $(if $(filter true,$(QEMU_DISPLAY)),vc,$(if $(filter false,$(QEMU_DISPLAY)),none))
+QEMU_ARG_DISPLAY = $(if $(filter true,$(QEMU_DISPLAY)),gtk,$(if $(filter false,$(QEMU_DISPLAY)),none))
+QEMU_ARG_MONITOR = $(if $(filter true,$(QEMU_DISPLAY)),vc,$(if $(filter false,$(QEMU_DISPLAY)),none))
+UEFI_LOADER_ARTIFACT = target/x86_64-unknown-uefi/$(PROFILE_DIR)/uefi-loader.efi
 
 .PHONY: default
 default: build
@@ -43,6 +46,7 @@ build: | kernel uefi-loader ARTIFACTS_DIR
 
 .PHONY: kernel
 kernel:
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
 	cargo build $(KERNEL_COMMON_CARGO_ARGS) \
 		-p kernel \
 		--profile $(CARGO_PROFILE) \
@@ -51,6 +55,7 @@ kernel:
 
 .PHONY: uefi-loader
 uefi-loader:
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
 	cargo build $(UEFI_LOADER_COMMON_CARGO_ARGS)\
 		-p uefi-loader \
 		--profile $(CARGO_PROFILE) \
@@ -104,11 +109,11 @@ qemu_integrationtest: | boot-vol
 	qemu-system-x86_64 \
 		-bios $(OVMF) \
 		-cpu $(QEMU_CPU_ARG) \
-		-display $(QEMU_DISPLAY_ARG) \
+		-display $(QEMU_ARG_DISPLAY) \
 		-drive "format=raw,file=fat:rw:$(QEMU_BOOT_VOL)" \
 		-m 512M \
-		-machine q35,accel=$(QEMU_ACCEL_ARG) \
-		-monitor $(QEMU_MONITOR_ARG) \
+		-machine q35,accel=$(QEMU_ARG_ACCEL) \
+		-monitor $(QEMU_ARG_MONITOR) \
 		-no-reboot \
 		-nodefaults \
 		-smp 4 \

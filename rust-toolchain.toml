@@ -3,12 +3,15 @@
 
 # targets and components are additive to the systems default values
 [toolchain]
+# The actual channel for the bins (kernel, loaders) is in the Makefile. This
+# was unfortunately necessary, as otherwise the JetBrains IDEs couldn't find
+# several dependencies from the Rust standard library anymore.
 channel = "stable"
 profile = "minimal"
 components = [
   "cargo",
   "clippy",
-  "miri",
+  #"miri",
   # for build-std feature
   "rust-src",
   "rust-std",
