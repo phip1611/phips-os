@@ -23,11 +23,12 @@ mod panic_handler;
 /// Set's up the stack before jumping into the Rust code.
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn kernel_entry() -> ! {
+#[unsafe(link_section = ".text.entry")]
+pub unsafe extern "sysv64" fn kernel_entry() -> ! {
     core::arch::naked_asm!(
         // todo stack aufsetzen
 
-        // Jump zum Kernel
+        // Jump to Kernel
         "mov $0xdeadbeef, %rax",
         "cli",
         "hlt",

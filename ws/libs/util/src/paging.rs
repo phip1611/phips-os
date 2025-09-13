@@ -1,5 +1,6 @@
 //! Module for x86_64 4-level paging.
 
+use crate::sizes::{ONE_GIB, TWO_MIB};
 use core::ops::RangeInclusive;
 use log::debug;
 
@@ -13,6 +14,7 @@ const LEVEL_BITS_MASK: usize = bit_ops::bitops_usize::create_mask(LEVEL_BITS);
 const LIMIT_MAX_PHYS_BITS: usize = bit_ops::bitops_usize::create_mask(52);
 
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Hash)]
+#[repr(transparent)]
 pub struct VirtAddress(pub u64);
 
 impl VirtAddress {
@@ -227,7 +229,7 @@ impl From<u64> for PhysMappingDest<'_> {
 }
 
 impl PhysMappingDest<'_> {
-    pub fn to_phys_addr(&self) -> u64 {
+    pub fn to_addr(&self) -> u64 {
         match self {
             PhysMappingDest::Addr(addr) => *addr,
             PhysMappingDest::Page(page) => page.as_ptr() as u64,
@@ -238,6 +240,12 @@ impl PhysMappingDest<'_> {
 }
 
 /// Performs a single mapping step.
+///
+/// Maps the virtual address for the given level with the given physical
+/// addresses for the page table and the physical destination.
+///
+/// # Panics
+/// If some fundamental assumptions are broken, this function panics.
 pub fn map_address_step(
     addr: VirtAddress,
     phys_src: &mut PageTable,
@@ -249,10 +257,15 @@ pub fn map_address_step(
 ) {
     if hugepage {
         assert!(level == 2 || level == 3);
+        if level == 2 {
+            assert!(phys_dest.to_addr().is_multiple_of(TWO_MIB as u64));
+        } else if level == 3 {
+            assert!(phys_dest.to_addr().is_multiple_of(ONE_GIB as u64));
+        }
     }
 
     let index = addr.index(level);
-    let phys_dest = phys_dest.to_phys_addr();
+    let phys_dest = phys_dest.to_addr();
     let flags = PageTableEntryFlags {
         present: true,
         write,

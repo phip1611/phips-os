@@ -42,6 +42,7 @@ default: build
 build: | kernel uefi-loader ARTIFACTS_DIR
 	ln -f -s ../$(KERNEL_ARTIFACT) $(ARTIFACTS_DIR)/kernel.elf64
 	ln -f -s ../$(UEFI_LOADER_ARTIFACT) $(ARTIFACTS_DIR)
+	cargo run --bin kernel-elf-checker -- $(ARTIFACTS_DIR)/kernel.elf64 >/dev/null
 
 
 .PHONY: kernel
@@ -51,7 +52,6 @@ kernel:
 		-p kernel \
 		--profile $(CARGO_PROFILE) \
 		--verbose
-
 
 .PHONY: uefi-loader
 uefi-loader:
@@ -66,17 +66,19 @@ uefi-loader:
 check:
 	cargo check \
 		-p kernel-lib \
-		-p uefi-loader-lib \
+		-p loader-lib \
 		-p util
-	cargo check -p kernel $(KERNEL_COMMON_CARGO_ARGS)
-	cargo check -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN)\
+		cargo check -p kernel $(KERNEL_COMMON_CARGO_ARGS)
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN)\
+		cargo check -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
 
 
 .PHONY: clippy
 clippy:
 	cargo clippy --all-targets --all-features \
 		-p kernel-lib \
-		-p uefi-loader-lib \
+		-p loader-lib \
 		-p util
 	cargo check --all-features -p kernel $(KERNEL_COMMON_CARGO_ARGS)
 	cargo check --all-features -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
@@ -86,7 +88,7 @@ clippy:
 doc:
 	cargo doc --no-deps --document-private-items \
 		-p kernel-lib \
-		-p uefi-loader-lib \
+		-p loader-lib \
 		-p util
 
 .PHONY: fmt
@@ -99,7 +101,16 @@ fmt:
 test:
 	cargo test \
 		-p kernel-lib \
-		-p uefi-loader-lib \
+		-p loader-lib \
+		-p util
+
+
+.PHONY: test-with-miri
+test-with-miri:
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
+	cargo miri test \
+		-p kernel-lib \
+		-p loader-lib \
 		-p util
 
 
@@ -118,7 +129,7 @@ qemu_integrationtest: | boot-vol
 		-nodefaults \
 		-smp 4 \
 		-vga std
-		# -d int
+		@# -d int
 
 
 .PHONY: run

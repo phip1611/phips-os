@@ -17,9 +17,16 @@
 
 mod logger;
 
-use log::error;
+use anyhow::Context;
+use loader_lib::KernelFile;
+use log::{debug, error, info};
 use std::os::uefi as uefi_std;
-use uefi::Handle;
+use uefi::fs::FileSystem;
+use uefi::{CStr16, Handle, cstr16};
+use util::paging::VirtAddress;
+
+/// The path on the boot volume where we expect the kernel file to be.
+const KERNEL_PATH: &CStr16 = cstr16!("kernel.elf64");
 
 /// Performs the necessary setup code for the [`uefi`] crate.
 fn setup_uefi_crate() {
@@ -35,34 +42,78 @@ fn setup_uefi_crate() {
     }
 }
 
+/// Loads the ELF as raw bytes from disk.
+fn load_kernel_elf_from_disk() -> anyhow::Result<Box<[u8]>> {
+    let handle = uefi::boot::image_handle();
+    let fs = uefi::boot::get_image_file_system(handle)?;
+    let mut fs = FileSystem::new(fs);
+    let bytes: Vec<u8> = fs
+        .read(KERNEL_PATH)
+        .map_err(|e: uefi::fs::Error| anyhow::Error::new(e))?;
+    Ok(bytes.into_boxed_slice())
+}
+
 /// Trampoline in UEFI loader to jump to kernel.
 ///
 /// This is the only part of the loader that will be mapped in the initial page
-/// tables of the loader. It is aligned to `8` bytes to prevent its
-/// instructions from crossing a page boundary. The `n` (`8`) must be less or
-/// equal to the size of the function.
+/// tables of the loader.
+///
+/// # Alignment
+/// The trampoline is aligned to `8` bytes to prevent its instructions from
+/// crossing a page boundary. The `n` (`8`) must be less or equal to the size
+/// of the function.
+///
+/// One can check the disassembly with `objdump` to verify this.
+///
+/// # Arguments
+///
+/// The arguments passed using the SystemV ABI calling convention.
+/// - `new_cr3`: the new root page table
+/// - `kernel_addr`: the entry point of the kernel
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn jump_to_kernel_trampoline() -> ! {
+pub unsafe extern "sysv64" fn jump_to_kernel_trampoline(
+    new_cr3: u64,
+    kernel_addr: VirtAddress,
+) -> ! {
     core::arch::naked_asm!(
+        // align:
         ".balign 8",
-        "mov %rcx, %cr3",
-        "jmp *%rdx",
+        "mov %rdi, %cr3",
+        "jmp *%rsi",
         "ud2",
         options(att_syntax)
     )
 }
 
+fn main_inner() -> anyhow::Result<()> {
+    // Early init of runtime.
+    {
+        setup_uefi_crate();
+        logger::init();
+        std::panic::set_hook(Box::new(|panic_info| {
+            error!("PANIC: {panic_info}");
+        }));
+    }
+
+    let file =
+        load_kernel_elf_from_disk().context("should be able to load kernel file from volume")?;
+    let kernel = KernelFile::from_bytes(&file).context("should be valid kernel")?;
+    let trampoline_addr = jump_to_kernel_trampoline as u64;
+
+    let new_cr3 = loader_lib::setup_page_tables(&kernel, trampoline_addr)?;
+
+    info!("Jumping to kernel");
+    debug!("  new cr3     : {:#x}", new_cr3);
+    debug!("  kernel entry: {:#x}", kernel.entry().0);
+    unsafe {
+        jump_to_kernel_trampoline(new_cr3, kernel.virt_start());
+    }
+}
+
 fn main() -> ! {
-    setup_uefi_crate();
-    logger::init();
-    std::panic::set_hook(Box::new(|panic_info| {
-        error!("PANIC: {panic_info}");
-    }));
-    let tramponline_addr = jump_to_kernel_trampoline as u64;
-    uefi_loader_lib::main(tramponline_addr).unwrap();
+    main_inner().unwrap();
     loop {
         core::hint::spin_loop();
     }
-    // uefi::runtime::reset(ResetType::SHUTDOWN, Status::SUCCESS, None);
 }
