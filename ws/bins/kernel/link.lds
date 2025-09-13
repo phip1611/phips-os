@@ -9,7 +9,7 @@ ENTRY(kernel_entry)
 OUTPUT_FORMAT("elf64-x86-64")
 OUTPUT_ARCH("i386:x86-64")
 
-/* Program headers. Also called segments. */
+/* Program headers for the segments. */
 PHDRS
 {
     /* FLAGS: 0b111 => +read +write +execute */
@@ -36,6 +36,7 @@ SECTIONS {
      */
     .text LINK_ADDR_RX : ALIGN(2M) /* TODO down to 4K align again: do it in loader instead */
     {
+        *(.text.entry)
         *(.text .text.*)
     } : rx
 
