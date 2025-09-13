@@ -12,3 +12,6 @@ rust-version.workspace = true
 [dependencies]
 bit_ops = { workspace = true }
 log = { workspace = true }
+heapless = { workspace = true }
+spin = { workspace = true, features = ["once"] }
+x86 = { workspace = true }

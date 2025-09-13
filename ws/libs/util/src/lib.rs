@@ -6,9 +6,11 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
+pub mod drivers;
 pub mod logging;
 pub mod mem;
 pub mod paging;
+pub mod sync;
 
 pub mod sizes {
     pub const FOUR_K: usize = 4096;

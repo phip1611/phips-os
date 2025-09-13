@@ -56,7 +56,7 @@ kernel:
 .PHONY: uefi-loader
 uefi-loader:
 	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
-	cargo build $(UEFI_LOADER_COMMON_CARGO_ARGS)\
+	cargo build $(UEFI_LOADER_COMMON_CARGO_ARGS) \
 		-p uefi-loader \
 		--profile $(CARGO_PROFILE) \
 		--verbose
@@ -68,9 +68,9 @@ check:
 		-p kernel-lib \
 		-p loader-lib \
 		-p util
-	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN)\
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
 		cargo check -p kernel $(KERNEL_COMMON_CARGO_ARGS)
-	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN)\
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
 		cargo check -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
 
 
@@ -80,8 +80,10 @@ clippy:
 		-p kernel-lib \
 		-p loader-lib \
 		-p util
-	cargo check --all-features -p kernel $(KERNEL_COMMON_CARGO_ARGS)
-	cargo check --all-features -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
+		cargo check --all-features -p kernel $(KERNEL_COMMON_CARGO_ARGS)
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) \
+		cargo check --all-features -p uefi-loader $(UEFI_LOADER_COMMON_CARGO_ARGS)
 
 
 .PHONY: doc
@@ -116,10 +118,11 @@ test-with-miri:
 
 .PHONY: qemu_integrationtest
 qemu_integrationtest: | boot-vol
-	# We don't use KVM here as QEMU better allows to debug issues.
+	@# QEMU/TCG allows better debuggability over QEMU/KVM
 	qemu-system-x86_64 \
 		-bios $(OVMF) \
 		-cpu $(QEMU_CPU_ARG) \
+		-debugcon file:debugcon.log \
 		-display $(QEMU_ARG_DISPLAY) \
 		-drive "format=raw,file=fat:rw:$(QEMU_BOOT_VOL)" \
 		-m 512M \

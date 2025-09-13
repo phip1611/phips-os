@@ -75,6 +75,17 @@ impl<'a> KernelFile<'a> {
             }
         }?;
 
+        // check: we have three LOAD segments
+        {
+            let count = load_segments_iter().count();
+            if count != 3 {
+                error!(
+                    "expected exactly three LOAD segments, but has {count}",
+                );
+                return Err(KernelFileError::InvalidLoadSegments);
+            }
+        };
+
         // check: We have the expected link address.
         {
             let first = load_segments_iter().next().unwrap();
@@ -167,10 +178,11 @@ impl<'a> KernelFile<'a> {
         self.segments().filter(|(hdr, _)| hdr.p_type == PT_LOAD)
     }
 
-    /// Returns the virtual start address of the kernel. 
-    /// 
+    /// Returns the virtual start address of the kernel.
+    ///
     /// Do not confuse this with [`Self::entry`] which is not guaranteed to be
     /// the same!
+    #[must_use]
     pub fn virt_start(&self) -> VirtAddress {
         // SAFETY; We checked in the constructor that we have valid segments.
         let vaddr = unsafe { self.load_segments().next().unwrap_unchecked().0.p_vaddr };
@@ -179,6 +191,7 @@ impl<'a> KernelFile<'a> {
 
     /// Returns the total memsize the kernel will use at runtime when it is
     /// mapped continuously into physical memory.
+    #[must_use]
     pub fn total_runtime_memsize(&self) -> usize {
         // we checked in the constructor that all LOAD segments are continuous
         self.load_segments()
@@ -187,8 +200,9 @@ impl<'a> KernelFile<'a> {
             .map(|pr_hdr| pr_hdr.p_memsz.next_multiple_of(TWO_MIB as u64))
             .sum::<u64>() as usize
     }
-    
-    /// Returns the address of the entry symbol. 
+
+    /// Returns the address of the entry symbol.
+    #[must_use]
     pub fn entry(&self) -> VirtAddress {
         self.elf.ehdr.e_entry.into()
     }

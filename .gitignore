@@ -4,4 +4,8 @@
 # Nix
 result*
 
+# Rust
 target
+
+# Misc
+debugcon.log

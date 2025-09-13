@@ -41,7 +41,7 @@ fn main() {
     log::set_logger(&Logger).unwrap();
     log::set_max_level(LevelFilter::Trace);
 
-    let elf_path = std::env::args().skip(1).next().unwrap();
+    let elf_path = std::env::args().nth(1).unwrap();
     let elf_bytes = fs::read(elf_path).unwrap();
 
     // This either returns success or panics.

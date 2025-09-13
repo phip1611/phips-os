@@ -17,11 +17,16 @@
 
 mod logger;
 
+static UEFI_BOOT_SERVICES_EXITED: AtomicBool = AtomicBool::new(false);
+
 use anyhow::Context;
 use loader_lib::KernelFile;
 use log::{debug, error, info};
+use std::mem::ManuallyDrop;
 use std::os::uefi as uefi_std;
+use std::sync::atomic::{AtomicBool, Ordering};
 use uefi::fs::FileSystem;
+use uefi::mem::memory_map::MemoryMapOwned;
 use uefi::{CStr16, Handle, cstr16};
 use util::paging::VirtAddress;
 
@@ -86,6 +91,16 @@ pub unsafe extern "sysv64" fn jump_to_kernel_trampoline(
     )
 }
 
+fn exit_boot_services() -> ManuallyDrop<MemoryMapOwned> {
+    UEFI_BOOT_SERVICES_EXITED.store(true, Ordering::SeqCst);
+
+    // SAFETY: After that, we do not call any boot services again. We also don't
+    // use UEFI allocations or deallocations.
+    let mmap = unsafe { uefi::boot::exit_boot_services(None) };
+    logger::exit_boot_services();
+    ManuallyDrop::new(mmap)
+}
+
 fn main_inner() -> anyhow::Result<()> {
     // Early init of runtime.
     {
@@ -102,12 +117,22 @@ fn main_inner() -> anyhow::Result<()> {
     let trampoline_addr = jump_to_kernel_trampoline as u64;
 
     let new_cr3 = loader_lib::setup_page_tables(&kernel, trampoline_addr)?;
+    let entry = kernel.entry();
+    drop(kernel);
+    drop(file);
+
+    // -------------------------------------------------------------------------
+    // No allocations etc. beyond this point.
+
+    debug!("Exiting UEFI boot services");
+    exit_boot_services();
+    info!("Exited UEFI boot services");
 
     info!("Jumping to kernel");
     debug!("  new cr3     : {:#x}", new_cr3);
-    debug!("  kernel entry: {:#x}", kernel.entry().0);
+    debug!("  kernel entry: {:#x}", entry.0);
     unsafe {
-        jump_to_kernel_trampoline(new_cr3, kernel.virt_start());
+        jump_to_kernel_trampoline(new_cr3, entry);
     }
 }
 
