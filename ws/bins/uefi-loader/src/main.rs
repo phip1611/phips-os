@@ -1,8 +1,11 @@
 //! UEFI-loader for the kernel of PhipsOS.
+//!
+//! This is a freestanding application and does not use the `std` implementation
+//! for `uefi`, as we need fine-grained control over the usage of UEFI boot
+//! services.
 
-// Note: As long as this feature is not stable, we need ot to access
-// `std::os::uefi::env::*`.
-#![feature(uefi_std)]
+#![no_std]
+#![no_main]
 #![deny(
     clippy::all,
     clippy::cargo,
@@ -14,17 +17,24 @@
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 #![deny(rustdoc::all)]
+extern crate alloc;
 
+mod config;
+mod heap;
 mod logger;
+mod panic_handler;
 
 static UEFI_BOOT_SERVICES_EXITED: AtomicBool = AtomicBool::new(false);
 
+use crate::config::Config;
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
 use anyhow::Context;
+use core::mem::ManuallyDrop;
+use core::sync::atomic::{AtomicBool, Ordering};
 use loader_lib::KernelFile;
 use log::{debug, error, info};
-use std::mem::ManuallyDrop;
-use std::os::uefi as uefi_std;
-use std::sync::atomic::{AtomicBool, Ordering};
 use uefi::fs::FileSystem;
 use uefi::mem::memory_map::MemoryMapOwned;
 use uefi::{CStr16, Handle, cstr16};
@@ -32,20 +42,6 @@ use util::paging::VirtAddress;
 
 /// The path on the boot volume where we expect the kernel file to be.
 const KERNEL_PATH: &CStr16 = cstr16!("kernel.elf64");
-
-/// Performs the necessary setup code for the [`uefi`] crate.
-fn setup_uefi_crate() {
-    let st = uefi_std::env::system_table();
-    let ih = uefi_std::env::image_handle();
-
-    // Mandatory setup code for `uefi` crate.
-    unsafe {
-        uefi::table::set_system_table(st.as_ptr().cast());
-
-        let ih = Handle::from_ptr(ih.as_ptr().cast()).unwrap();
-        uefi::boot::set_image_handle(ih);
-    }
-}
 
 /// Loads the ELF as raw bytes from disk.
 fn load_kernel_elf_from_disk() -> anyhow::Result<Box<[u8]>> {
@@ -56,6 +52,11 @@ fn load_kernel_elf_from_disk() -> anyhow::Result<Box<[u8]>> {
         .read(KERNEL_PATH)
         .map_err(|e: uefi::fs::Error| anyhow::Error::new(e))?;
     Ok(bytes.into_boxed_slice())
+}
+
+struct PreExitBootServicesData {
+    kernel: Box<Vec<u8>>,
+    config: Config,
 }
 
 /// Trampoline in UEFI loader to jump to kernel.
@@ -102,14 +103,9 @@ fn exit_boot_services() -> ManuallyDrop<MemoryMapOwned> {
 }
 
 fn main_inner() -> anyhow::Result<()> {
-    // Early init of runtime.
-    {
-        setup_uefi_crate();
-        logger::init();
-        std::panic::set_hook(Box::new(|panic_info| {
-            error!("PANIC: {panic_info}");
-        }));
-    }
+    logger::early_init();
+    heap::init();
+    logger::init();
 
     let file =
         load_kernel_elf_from_disk().context("should be able to load kernel file from volume")?;
@@ -136,9 +132,8 @@ fn main_inner() -> anyhow::Result<()> {
     }
 }
 
-fn main() -> ! {
+#[uefi::entry]
+fn main() -> uefi::Status {
     main_inner().unwrap();
-    loop {
-        core::hint::spin_loop();
-    }
+    unreachable!();
 }

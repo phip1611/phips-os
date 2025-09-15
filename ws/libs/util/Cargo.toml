@@ -12,6 +12,6 @@ rust-version.workspace = true
 [dependencies]
 bit_ops = { workspace = true }
 log = { workspace = true }
-heapless = { workspace = true }
-spin = { workspace = true, features = ["once"] }
+spin = { workspace = true, features = ["once", "spin_mutex"] }
 x86 = { workspace = true }
+zerocopy = { workspace = true, features = ["derive"] }

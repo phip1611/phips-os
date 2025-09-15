@@ -3,9 +3,10 @@ mod debugcon;
 pub use debugcon::*;
 
 use alloc::boxed::Box;
+use core::cell::OnceCell;
 use core::fmt;
 use log::{LevelFilter, Log, Metadata, Record};
-use spin::Once as SyncOnceCell;
+use spin::Mutex as SpinMutex;
 
 /// Actually formats a [`log`] message properly and writes it to the
 /// corresponding destination specified by `writer`.
@@ -26,21 +27,28 @@ pub fn fmt_and_write_msg(writer: &mut dyn fmt::Write, record: &Record) -> core::
 ///
 /// This is for applications without runtime, i.e., OS loader, kernel, etc.
 /// To start logging, [`LoggerFacade::init`] must be called once.
-pub struct LoggerFacade(SyncOnceCell<LoggerFacadeInner>);
+pub struct LoggerFacade(SpinMutex<OnceCell<LoggerFacadeInner>>);
 
 impl LoggerFacade {
     /// Creates a new default object.
     pub const fn new() -> LoggerFacade {
-        Self(SyncOnceCell::new())
+        Self(SpinMutex::new(OnceCell::new()))
     }
 
     /// Inits the logger.
     ///
     /// This operation must only be called once.
     pub fn init<'a: 'static>(&'a self, inner: LoggerFacadeInner, max_level: LevelFilter) {
-        self.0.call_once(|| inner);
-        let _ = log::set_logger(self);
+        self.0.lock().get_or_init(|| inner);
+        log::set_logger(self).expect("should init logger only once");
         log::set_max_level(max_level);
+    }
+
+    /// Updates the object from the given closure.
+    pub fn update(&self, update_fn: impl Fn(&mut LoggerFacadeInner)) {
+        let mut guard = self.0.lock();
+        let inner = guard.get_mut().expect("should have initialized logger");
+        update_fn(inner);
     }
 }
 
@@ -52,15 +60,19 @@ impl Default for LoggerFacade {
 
 impl Log for LoggerFacade {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        self.0.get().map(|f| f.enabled(metadata)).unwrap_or(false)
+        self.0
+            .lock()
+            .get()
+            .map(|f| f.enabled(metadata))
+            .unwrap_or(false)
     }
 
     fn log(&self, record: &Record) {
-        let _ = self.0.get().map(|f| f.log(record));
+        let _ = self.0.lock().get().map(|f| f.log(record));
     }
 
     fn flush(&self) {
-        let _ = self.0.get().map(|f| f.flush());
+        let _ = self.0.lock().get().map(|f| f.flush());
     }
 }
 
@@ -106,9 +118,9 @@ impl Log for LoggerFacadeInner {
 
     fn log(&self, record: &Record) {
         for logger in self.loggers().into_iter().flatten() {
-            if  logger.enabled(record.metadata()) {
-                    logger.log(record);
-                }
+            if logger.enabled(record.metadata()) {
+                logger.log(record);
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 //! Library for generic and unit-testable functionality of the uefi-loader.
 
+#![no_std]
 #![deny(
     clippy::all,
     clippy::cargo,
@@ -16,13 +17,15 @@ extern crate alloc;
 #[cfg(test)]
 extern crate std;
 
+mod boot_information;
 mod kernel_file;
 
 pub use kernel_file::KernelFile;
 
+use alloc::boxed::Box;
+use core::mem::ManuallyDrop;
+use core::ops::DerefMut;
 use log::debug;
-use std::mem::ManuallyDrop;
-use std::ops::DerefMut;
 use util::mem::AlignedBuffer;
 use util::paging::{PAGE_MASK, PageTable, PhysMappingDest, VirtAddress, map_address_step};
 use util::sizes::TWO_MIB;

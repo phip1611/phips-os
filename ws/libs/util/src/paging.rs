@@ -13,6 +13,20 @@ const LEVEL_BITS_MASK: usize = bit_ops::bitops_usize::create_mask(LEVEL_BITS);
 /// Maximum physical address with 4-level paging.
 const LIMIT_MAX_PHYS_BITS: usize = bit_ops::bitops_usize::create_mask(52);
 
+/// Wrapper around a `u64` marking this data as physical address.
+#[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Hash)]
+#[repr(transparent)]
+pub struct PhysAddress(pub u64);
+
+impl PhysAddress {}
+
+impl From<u64> for PhysAddress {
+    fn from(value: u64) -> PhysAddress {
+        Self(value)
+    }
+}
+
+/// Wrapper around a `u64` marking this data as virtual address.
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Hash)]
 #[repr(transparent)]
 pub struct VirtAddress(pub u64);

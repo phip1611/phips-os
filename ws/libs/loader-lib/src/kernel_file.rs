@@ -79,9 +79,7 @@ impl<'a> KernelFile<'a> {
         {
             let count = load_segments_iter().count();
             if count != 3 {
-                error!(
-                    "expected exactly three LOAD segments, but has {count}",
-                );
+                error!("expected exactly three LOAD segments, but has {count}",);
                 return Err(KernelFileError::InvalidLoadSegments);
             }
         };

@@ -11,4 +11,6 @@ rust-version.workspace = true
 
 
 [dependencies]
+bitflags = { workspace = true }
 util = { path = "../util" }
+zerocopy = { workspace = true, features = ["alloc", "derive"] }

@@ -13,6 +13,10 @@
 #![deny(missing_debug_implementations)]
 #![deny(rustdoc::all)]
 
+mod boot_information;
+mod memory_map;
+
+extern crate alloc;
 #[cfg(test)]
 extern crate std;
 

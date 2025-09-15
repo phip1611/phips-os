@@ -1,17 +1,24 @@
 use crate::UEFI_BOOT_SERVICES_EXITED;
+use alloc::boxed::Box;
+use core::fmt::Write;
+use core::sync::atomic::Ordering;
 use log::{LevelFilter, Log, Metadata, Record};
-use std::fmt::Write;
-use std::sync::atomic::Ordering;
 use util::logging::{DebugconLogger, LoggerFacade, LoggerFacadeInner, fmt_and_write_msg};
 
 static LOGGER: LoggerFacade = LoggerFacade::new();
 
-/// Inits the logger.
-pub fn init() {
+/// Inits early loggers that doesn't need allocation.
+pub fn early_init() {
     let mut logger = LoggerFacadeInner::new();
     logger.set_debugcon(DebugconLogger);
-    logger.set_stdout_logger(Box::new(StdOutLogger));
     LOGGER.init(logger, LevelFilter::Trace);
+    log::debug!("initialized early loggers");
+}
+
+/// Inits additional loggers and logging that need memory allocations.
+pub fn init() {
+    LOGGER.update(|logger| logger.set_stdout_logger(Box::new(StdOutLogger)));
+    log::debug!("initialized additional loggers");
 }
 
 /// Removes any logging functionality using UEFI boot services.

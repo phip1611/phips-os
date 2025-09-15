@@ -13,6 +13,10 @@ rust-version.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 log = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["alloc"] }
+spin = { workspace = true, features = ["spin_mutex"] }
 uefi = { workspace = true, features = ["alloc"] }
 loader-lib = { path = "../../libs/loader-lib"}
 util = { path = "../../libs/util" }
+talc = { workspace = true, features = ["lock_api"] }
