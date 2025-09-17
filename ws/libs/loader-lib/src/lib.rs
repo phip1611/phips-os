@@ -73,14 +73,13 @@ pub fn setup_page_tables(
 
         let mut dst_buffer_offset = 0;
         let n = kernel.load_segments().count();
-        for (i, (pr_hdr, data)) in kernel.load_segments().enumerate() {
+        for (i_load_segment, (pr_hdr, data)) in kernel.load_segments().enumerate() {
             // Step 1/2: Copy segment data to aligned memory
             let end = dst_buffer_offset + data.len();
             let phys_dst = &mut dst_buffer[dst_buffer_offset..end];
             phys_dst.copy_from_slice(data);
 
             // Step 2/2: Create mapping to memory
-
             let phys_addr = phys_dst.as_ptr() as u64;
             assert!(
                 phys_addr.is_multiple_of(TWO_MIB as u64),
@@ -89,26 +88,35 @@ pub fn setup_page_tables(
 
             let write = pr_hdr.p_flags & elf::abi::PF_W != 0;
             let execute = pr_hdr.p_flags & elf::abi::PF_X != 0;
+
+            // Next, we have to map the segment in possible multiple steps.
+            let steps = pr_hdr.p_memsz.div_ceil(TWO_MIB as u64);
             debug!(
-                "Mapping LOAD segment #{}/{n} (execute={}, write={})",
-                i + 1,
+                "Mapping LOAD segment #{}/{n} (execute={}, write={}) (with {steps} huge pages)",
+                i_load_segment + 1,
                 execute,
-                write
-            );
-
-            map_address(
-                Some(pt_l4.as_page().as_paddr()),
-                VirtAddress(pr_hdr.p_vaddr),
-                PhysAddress(phys_addr),
-                // UEFI: identity mapping
-                |a| VirtAddress(a.0),
-                |a| PhysAddress(a.0),
                 write,
-                execute,
-                true,
             );
+            for i_step in 0..steps {
+                debug!("page {}/{steps}", i_step + 1);
 
-            dst_buffer_offset += data.len().next_multiple_of(TWO_MIB);
+                let vaddr = pr_hdr.p_vaddr + i_step * TWO_MIB as u64;
+                let paddr = phys_addr + i_step * TWO_MIB as u64;
+
+                map_address(
+                    Some(pt_l4.as_page().as_paddr()),
+                    VirtAddress(vaddr),
+                    PhysAddress(paddr),
+                    // UEFI: identity mapping
+                    |a| VirtAddress(a.0),
+                    |a| PhysAddress(a.0),
+                    write,
+                    execute,
+                    true,
+                );
+
+                dst_buffer_offset += data.len().next_multiple_of(TWO_MIB);
+            }
         }
     }
 

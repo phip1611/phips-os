@@ -116,12 +116,16 @@ impl<'a> KernelFile<'a> {
 
         // check virtual address space is contiguous
         for (pr_hdr, pr_hdr_ne) in load_segments_iter().zip(load_segments_iter().skip(1)) {
-            let expected_next_vaddr = pr_hdr.p_vaddr + pr_hdr.p_memsz.next_multiple_of(TWO_MIB as u64);
+            let expected_next_vaddr =
+                pr_hdr.p_vaddr + pr_hdr.p_memsz.next_multiple_of(TWO_MIB as u64);
             if expected_next_vaddr != pr_hdr_ne.p_vaddr {
                 error!("LOAD segments are not contiguous in virtual memory space:",);
                 error!("  vaddr   (current)  = {:#x}", pr_hdr.p_vaddr);
                 error!("  memsize (current)  = {:#018x}", pr_hdr.p_memsz);
-                error!("                       {:#018x} (next multiple of 2 MiB),", pr_hdr.p_memsz.next_multiple_of(TWO_MIB as u64));
+                error!(
+                    "                       {:#018x} (next multiple of 2 MiB),",
+                    pr_hdr.p_memsz.next_multiple_of(TWO_MIB as u64)
+                );
                 error!("  vaddr   (next)     = {:#x}", pr_hdr_ne.p_vaddr);
                 error!("  vaddr   (expected) = {:#x}", expected_next_vaddr);
                 return Err(KernelFileError::InvalidLoadSegments);
