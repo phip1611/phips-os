@@ -1,14 +1,25 @@
 //! Abstraction over the ELF file of the kernel.
 
-use core::slice;
-use elf::ElfBytes;
-use elf::abi::{PF_R, PF_W, PF_X, PT_LOAD};
-use elf::endian::LittleEndian;
-use elf::segment::ProgramHeader;
-use log::error;
-use thiserror::Error;
-use util::paging::VirtAddress;
-use util::sizes::TWO_MIB;
+use {
+    core::slice,
+    elf::{
+        ElfBytes,
+        abi::{
+            PF_R,
+            PF_W,
+            PF_X,
+            PT_LOAD,
+        },
+        endian::LittleEndian,
+        segment::ProgramHeader,
+    },
+    log::error,
+    thiserror::Error,
+    util::{
+        paging::VirtAddress,
+        sizes::TWO_MIB,
+    },
+};
 
 /// Possible errors when creating a [`KernelFile`] via
 /// [`KernelFile::from_bytes`].

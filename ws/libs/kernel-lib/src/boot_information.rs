@@ -1,7 +1,16 @@
-use crate::memory_map::MemoryMapEntry;
-use alloc::boxed::Box;
-use alloc::vec;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use {
+    crate::memory_map::MemoryMapEntry,
+    alloc::{
+        boxed::Box,
+        vec,
+    },
+    zerocopy::{
+        FromBytes,
+        Immutable,
+        IntoBytes,
+        KnownLayout,
+    },
+};
 
 /// Raw boot information.
 ///

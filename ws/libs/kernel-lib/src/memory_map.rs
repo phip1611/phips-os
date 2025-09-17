@@ -1,6 +1,14 @@
-use core::slice;
-use util::paging::VirtAddress;
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Unaligned};
+use {
+    core::slice,
+    util::paging::VirtAddress,
+    zerocopy::{
+        FromBytes,
+        Immutable,
+        IntoBytes,
+        KnownLayout,
+        Unaligned,
+    },
+};
 
 type MemoryMapEntryFlagsRaw = u8;
 
@@ -157,8 +165,10 @@ pub struct MemoryMap([MemoryMapEntry]);
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use std::prelude::v1::Box;
+    use {
+        super::*,
+        std::prelude::v1::Box,
+    };
 
     #[test]
     fn test_to_and_from_bytes() {

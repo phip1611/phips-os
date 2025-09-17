@@ -1,5 +1,7 @@
-use core::panic::PanicInfo;
-use log::error;
+use {
+    core::panic::PanicInfo,
+    log::error,
+};
 
 #[panic_handler]
 fn handle_panic(panic_info: &PanicInfo) -> ! {

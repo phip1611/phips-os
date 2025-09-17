@@ -1,7 +1,14 @@
-use crate::drivers::DebugCon;
-use crate::logging::fmt_and_write_msg;
-use core::fmt::Write;
-use log::{Metadata, Record};
+use {
+    crate::{
+        drivers::DebugCon,
+        logging::fmt_and_write_msg,
+    },
+    core::fmt::Write,
+    log::{
+        Metadata,
+        Record,
+    },
+};
 
 pub struct DebugconLogger;
 

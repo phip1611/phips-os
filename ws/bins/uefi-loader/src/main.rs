@@ -26,19 +26,36 @@ mod panic_handler;
 
 static UEFI_BOOT_SERVICES_EXITED: AtomicBool = AtomicBool::new(false);
 
-use crate::config::Config;
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
-use anyhow::Context;
-use core::mem::ManuallyDrop;
-use core::sync::atomic::{AtomicBool, Ordering};
-use loader_lib::KernelFile;
-use log::{debug, error, info};
-use uefi::fs::FileSystem;
-use uefi::mem::memory_map::MemoryMapOwned;
-use uefi::{CStr16, Handle, cstr16};
-use util::paging::VirtAddress;
+use {
+    crate::config::Config,
+    alloc::{
+        boxed::Box,
+        string::String,
+        vec::Vec,
+    },
+    anyhow::Context,
+    core::{
+        mem::ManuallyDrop,
+        sync::atomic::{
+            AtomicBool,
+            Ordering,
+        },
+    },
+    loader_lib::KernelFile,
+    log::{
+        debug,
+        error,
+        info,
+    },
+    uefi::{
+        CStr16,
+        Handle,
+        cstr16,
+        fs::FileSystem,
+        mem::memory_map::MemoryMapOwned,
+    },
+    util::paging::VirtAddress,
+};
 
 /// The path on the boot volume where we expect the kernel file to be.
 const KERNEL_PATH: &CStr16 = cstr16!("kernel.elf64");

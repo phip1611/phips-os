@@ -1,7 +1,15 @@
-use core::alloc::Layout;
-use core::ops::{Deref, DerefMut, Index, IndexMut};
-use core::ops::{Range, RangeInclusive};
-use core::slice;
+use core::{
+    alloc::Layout,
+    ops::{
+        Deref,
+        DerefMut,
+        Index,
+        IndexMut,
+        Range,
+        RangeInclusive,
+    },
+    slice,
+};
 
 /// An aligned buffer. Similar to `Box<[T]>` but with guaranteed alignment.
 #[derive(Debug)]
@@ -103,8 +111,10 @@ impl<T> Drop for AlignedBuffer<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::sizes::TWO_MIB;
+    use {
+        super::*,
+        crate::sizes::TWO_MIB,
+    };
 
     // Main test here is that miri accepts the test.
     #[test]

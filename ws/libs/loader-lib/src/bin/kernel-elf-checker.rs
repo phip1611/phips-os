@@ -1,8 +1,21 @@
-use loader_lib::KernelFile;
-use log::{LevelFilter, Log, Metadata, Record};
-use std::io::stdout;
-use std::{fmt, fs, io};
-use util::logging::fmt_and_write_msg;
+use {
+    loader_lib::KernelFile,
+    log::{
+        LevelFilter,
+        Log,
+        Metadata,
+        Record,
+    },
+    std::{
+        fmt,
+        fs,
+        io::{
+            self,
+            stdout,
+        },
+    },
+    util::logging::fmt_and_write_msg,
+};
 
 struct IoToFmt<W: io::Write>(W);
 

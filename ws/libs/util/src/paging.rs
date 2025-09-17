@@ -1,8 +1,13 @@
 //! Module for x86_64 4-level paging.
 
-use crate::sizes::{ONE_GIB, TWO_MIB};
-use core::ops::RangeInclusive;
-use log::debug;
+use {
+    crate::sizes::{
+        ONE_GIB,
+        TWO_MIB,
+    },
+    core::ops::RangeInclusive,
+    log::debug,
+};
 
 pub const PAGE_SIZE: usize = 4096;
 pub const PAGE_MASK: usize = 0xfff;

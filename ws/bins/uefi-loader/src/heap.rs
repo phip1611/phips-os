@@ -4,15 +4,30 @@
 //! we use [`talc`] on that backing memory. This way, we can use allocations and
 //! deallocations even after exiting the UEFI boot services.
 
-use alloc::vec;
-use core::alloc::{GlobalAlloc, Layout};
-use core::cell::OnceCell;
-use core::hint::black_box;
-use core::ptr::NonNull;
-use spin::Mutex as SpinMutex;
-use talc::{ErrOnOom, Span, Talc};
-use uefi::boot::{AllocateType, MemoryType, allocate_pages};
-use util::paging::PAGE_SIZE;
+use {
+    alloc::vec,
+    core::{
+        alloc::{
+            GlobalAlloc,
+            Layout,
+        },
+        cell::OnceCell,
+        hint::black_box,
+        ptr::NonNull,
+    },
+    spin::Mutex as SpinMutex,
+    talc::{
+        ErrOnOom,
+        Span,
+        Talc,
+    },
+    uefi::boot::{
+        AllocateType,
+        MemoryType,
+        allocate_pages,
+    },
+    util::paging::PAGE_SIZE,
+};
 
 /// Heap size of 64 MiB.
 ///

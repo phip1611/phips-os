@@ -1,8 +1,18 @@
-use alloc::string::String;
-use alloc::vec::Vec;
-use serde::{Deserialize, Serialize};
-use uefi::fs::FileSystem;
-use uefi::{CStr16, cstr16};
+use {
+    alloc::{
+        string::String,
+        vec::Vec,
+    },
+    serde::{
+        Deserialize,
+        Serialize,
+    },
+    uefi::{
+        CStr16,
+        cstr16,
+        fs::FileSystem,
+    },
+};
 
 pub const DEFAULT_CONFIG_PATH: &CStr16 = cstr16!("phips_os_config.json");
 

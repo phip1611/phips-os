@@ -21,14 +21,25 @@ mod boot_information;
 mod kernel_file;
 
 pub use kernel_file::KernelFile;
-
-use alloc::boxed::Box;
-use core::mem::ManuallyDrop;
-use core::ops::DerefMut;
-use log::debug;
-use util::mem::AlignedBuffer;
-use util::paging::{PAGE_MASK, PageTable, PhysMappingDest, VirtAddress, map_address_step};
-use util::sizes::TWO_MIB;
+use {
+    alloc::boxed::Box,
+    core::{
+        mem::ManuallyDrop,
+        ops::DerefMut,
+    },
+    log::debug,
+    util::{
+        mem::AlignedBuffer,
+        paging::{
+            PAGE_MASK,
+            PageTable,
+            PhysMappingDest,
+            VirtAddress,
+            map_address_step,
+        },
+        sizes::TWO_MIB,
+    },
+};
 
 /// Prepares the page-tables for the kernel in ELF format.
 ///

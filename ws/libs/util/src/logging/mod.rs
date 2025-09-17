@@ -1,12 +1,20 @@
 mod debugcon;
 
 pub use debugcon::*;
-
-use alloc::boxed::Box;
-use core::cell::OnceCell;
-use core::fmt;
-use log::{LevelFilter, Log, Metadata, Record};
-use spin::Mutex as SpinMutex;
+use {
+    alloc::boxed::Box,
+    core::{
+        cell::OnceCell,
+        fmt,
+    },
+    log::{
+        LevelFilter,
+        Log,
+        Metadata,
+        Record,
+    },
+    spin::Mutex as SpinMutex,
+};
 
 /// Actually formats a [`log`] message properly and writes it to the
 /// corresponding destination specified by `writer`.
@@ -133,10 +141,15 @@ impl Log for LoggerFacadeInner {
 
 #[cfg(test)]
 mod tests {
-    use crate::logging::test_support::StdErrLogger;
-    use crate::logging::{LoggerFacade, LoggerFacadeInner};
-    use alloc::boxed::Box;
-    use log::LevelFilter;
+    use {
+        crate::logging::{
+            LoggerFacade,
+            LoggerFacadeInner,
+            test_support::StdErrLogger,
+        },
+        alloc::boxed::Box,
+        log::LevelFilter,
+    };
 
     static TEST_LOGGER: LoggerFacade = LoggerFacade::new();
 

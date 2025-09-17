@@ -1,9 +1,23 @@
-use crate::UEFI_BOOT_SERVICES_EXITED;
-use alloc::boxed::Box;
-use core::fmt::Write;
-use core::sync::atomic::Ordering;
-use log::{LevelFilter, Log, Metadata, Record};
-use util::logging::{DebugconLogger, LoggerFacade, LoggerFacadeInner, fmt_and_write_msg};
+use {
+    crate::UEFI_BOOT_SERVICES_EXITED,
+    alloc::boxed::Box,
+    core::{
+        fmt::Write,
+        sync::atomic::Ordering,
+    },
+    log::{
+        LevelFilter,
+        Log,
+        Metadata,
+        Record,
+    },
+    util::logging::{
+        DebugconLogger,
+        LoggerFacade,
+        LoggerFacadeInner,
+        fmt_and_write_msg,
+    },
+};
 
 static LOGGER: LoggerFacade = LoggerFacade::new();
 

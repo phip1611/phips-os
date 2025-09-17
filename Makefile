@@ -95,7 +95,8 @@ doc:
 
 .PHONY: fmt
 fmt:
-	cargo fmt --all
+	@# We use some nightly features of rustfmt.
+	RUSTUP_TOOLCHAIN=$(RUSTUP_NIGHTLY_TOOLCHAIN) cargo fmt --all
 	nix fmt
 
 
