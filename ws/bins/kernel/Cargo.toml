@@ -13,4 +13,7 @@ rust-version.workspace = true
 [dependencies]
 kernel-lib = { path = "../../libs/kernel-lib"}
 util = { path = "../../libs/util" }
-log = "0.4.28"
+anyhow = { workspace = true }
+log = { workspace = true }
+talc = { workspace = true }
+spin = { workspace = true }

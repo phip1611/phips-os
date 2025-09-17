@@ -14,9 +14,14 @@
 #![deny(missing_debug_implementations)]
 #![deny(rustdoc::all)]
 
+extern crate alloc;
+
 use log::info;
 
+mod heap;
+mod logger;
 mod panic_handler;
+mod stack;
 
 /// Entry into the kernel.
 ///
@@ -26,24 +31,24 @@ mod panic_handler;
 #[unsafe(link_section = ".text.entry")]
 pub unsafe extern "sysv64" fn kernel_entry() -> ! {
     core::arch::naked_asm!(
-        // todo stack aufsetzen
-
-        // Jump to Kernel
-        "mov $0xdeadbeef, %rax",
-        "cli",
-        "hlt",
-        "jmp main",
+        // Set up stack. Symbol comes from Rust.
+        "mov (STACK_TOP), %rsp",
+        "call main",
         "ud2",
         options(att_syntax)
     )
 }
 
-#[unsafe(no_mangle)]
-fn main() -> ! {
+fn main_inner() -> anyhow::Result<()> {
+    logger::early_init();
     let mut data = core::hint::black_box([1, 2, 3, 4]);
     data[3] = 7;
     info!("Hello world from kernel: {:?}", data);
-    loop {
-        core::hint::spin_loop();
-    }
+    Ok(())
+}
+
+#[unsafe(no_mangle)]
+fn main() -> ! {
+    main_inner().unwrap();
+    unreachable!("");
 }

@@ -109,7 +109,6 @@ fn exit_boot_services() -> ManuallyDrop<MemoryMapOwned> {
     // SAFETY: After that, we do not call any boot services again. We also don't
     // use UEFI allocations or deallocations.
     let mmap = unsafe { uefi::boot::exit_boot_services(None) };
-    logger::exit_boot_services();
     ManuallyDrop::new(mmap)
 }
 

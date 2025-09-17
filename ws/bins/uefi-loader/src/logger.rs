@@ -35,9 +35,6 @@ pub fn init() {
     log::debug!("initialized additional loggers");
 }
 
-/// Removes any logging functionality using UEFI boot services.
-pub fn exit_boot_services() {}
-
 struct StdOutLogger;
 
 impl Log for StdOutLogger {
