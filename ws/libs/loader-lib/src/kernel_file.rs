@@ -114,17 +114,9 @@ impl<'a> KernelFile<'a> {
             return Err(KernelFileError::InvalidLoadSegments);
         }
 
-        // check: memsize == filesize.
-        // This makes the actual size of the kernel more clear and loading a
-        // bit easier.
-        if load_segments_iter().any(|pr_hdr| pr_hdr.p_filesz != pr_hdr.p_memsz) {
-            error!("not all LOAD segments have equal mem size and file size");
-            return Err(KernelFileError::InvalidLoadSegments);
-        }
-
         // check virtual address space is contiguous
         for (pr_hdr, pr_hdr_ne) in load_segments_iter().zip(load_segments_iter().skip(1)) {
-            let expected_next_vaddr = pr_hdr.p_vaddr + pr_hdr_ne.p_filesz;
+            let expected_next_vaddr = pr_hdr.p_vaddr + pr_hdr_ne.p_memsz;
             let expected_next_vaddr = expected_next_vaddr.next_multiple_of(TWO_MIB as u64);
             if expected_next_vaddr != pr_hdr_ne.p_vaddr {
                 error!("LOAD segments are not contiguous in virtual memory space");
