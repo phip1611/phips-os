@@ -1,3 +1,6 @@
+// TODO remove
+#![allow(unused)]
+
 use {
     core::slice,
     util::paging::VirtAddress,
@@ -198,6 +201,5 @@ mod tests {
         let entries_bytes = entries.as_bytes();
         let map = MemoryMap::ref_from_bytes(entries_bytes).unwrap();
         assert_eq!(&map.0, &entries);
-        let x = Box::from(*map);
     }
 }

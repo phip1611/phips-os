@@ -1,15 +1,9 @@
-use {
-    crate::memory_map::MemoryMapEntry,
-    alloc::{
-        boxed::Box,
-        vec,
-    },
-    zerocopy::{
-        FromBytes,
-        Immutable,
-        IntoBytes,
-        KnownLayout,
-    },
+// TODO remove
+#![allow(unused)]
+
+use zerocopy::{
+    Immutable,
+    IntoBytes,
 };
 
 /// Raw boot information.

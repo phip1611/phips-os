@@ -23,19 +23,16 @@ mod kernel_file;
 pub use kernel_file::KernelFile;
 use {
     alloc::boxed::Box,
-    core::{
-        mem::ManuallyDrop,
-        ops::DerefMut,
-    },
+    core::mem::ManuallyDrop,
     log::debug,
     util::{
         mem::AlignedBuffer,
         paging::{
             PAGE_MASK,
             PageTable,
-            PhysMappingDest,
+            PhysAddress,
             VirtAddress,
-            map_address_step,
+            map_address,
         },
         sizes::TWO_MIB,
     },
@@ -61,41 +58,16 @@ use {
 /// - 1x trampoline
 pub fn setup_page_tables(
     kernel: &KernelFile<'_>,
-    trampoline_addr: u64,
+    trampoline_addr: VirtAddress,
+    _boot_information: VirtAddress,
+    _virt_to_phys: impl Fn(VirtAddress) -> PhysAddress,
 ) -> anyhow::Result<u64 /* addr of pml4 */> {
-    let mut pt_l4 = ManuallyDrop::new(Box::new(PageTable::ZERO));
-    let mut pt_l3 = ManuallyDrop::new(Box::new(PageTable::ZERO));
-    let mut pt_l2 = ManuallyDrop::new(Box::new(PageTable::ZERO));
+    let pt_l4 = ManuallyDrop::new(Box::new(PageTable::ZERO));
 
-    let vaddr = kernel.virt_start();
-
-    // generic setup
-    {
-        // map l4 -> l3
-        map_address_step(
-            vaddr,
-            pt_l4.deref_mut(),
-            PhysMappingDest::Page(pt_l3.as_page()),
-            4,
-            true,
-            false,
-            false,
-        );
-        // map l3 -> l2
-        map_address_step(
-            vaddr,
-            pt_l3.deref_mut(),
-            PhysMappingDest::Page(pt_l2.as_page()),
-            3,
-            true,
-            false,
-            false,
-        );
-    }
-
+    debug!("mapping kernel");
     // Huge page mappings for each segment of the kernel.
     {
-        // An aligned buffer sufficient in size.
+        // An aligned buffer to hold all LOAD segments.
         let dst_buffer = AlignedBuffer::<u8>::new(kernel.total_runtime_memsize(), TWO_MIB);
         let mut dst_buffer = ManuallyDrop::new(dst_buffer);
 
@@ -123,70 +95,38 @@ pub fn setup_page_tables(
                 execute,
                 write
             );
-            map_address_step(
+
+            map_address(
+                Some(pt_l4.as_page().as_paddr()),
                 VirtAddress(pr_hdr.p_vaddr),
-                pt_l2.deref_mut(),
-                PhysMappingDest::Addr(phys_addr),
-                2,
+                PhysAddress(phys_addr),
+                // UEFI: identity mapping
+                |a| VirtAddress(a.0),
+                |a| PhysAddress(a.0),
                 write,
+                execute,
                 true,
-                !execute,
             );
 
             dst_buffer_offset += data.len().next_multiple_of(TWO_MIB);
         }
     }
 
+    debug!("Mapping trampoline at {trampoline_addr}");
     // trampoline setup
     {
-        debug!("Mapping trampoline next: at {trampoline_addr:#x}");
-        let trampoline_addr = VirtAddress(trampoline_addr);
-        let l4_index = trampoline_addr.index(4);
-        if pt_l4.0[l4_index].flags().present {
-            panic!("l4 already present; unexpected");
-        }
-
-        let mut pt_trampoline_l3 = ManuallyDrop::new(Box::new(PageTable::ZERO));
-        map_address_step(
-            trampoline_addr,
-            pt_l4.deref_mut(),
-            PhysMappingDest::Page(pt_trampoline_l3.as_page()),
-            4,
-            false,
-            false,
-            false,
-        );
-
-        let mut pt_trampoline_l2 = ManuallyDrop::new(Box::new(PageTable::ZERO));
-        map_address_step(
-            trampoline_addr,
-            pt_trampoline_l3.deref_mut(),
-            PhysMappingDest::Page(pt_trampoline_l2.as_page()),
-            3,
-            false,
-            false,
-            false,
-        );
-
-        let mut pt_trampoline_l1 = ManuallyDrop::new(Box::new(PageTable::ZERO));
-        map_address_step(
-            trampoline_addr,
-            pt_trampoline_l2.deref_mut(),
-            PhysMappingDest::Page(pt_trampoline_l1.as_page()),
-            2,
-            false,
-            false,
-            false,
-        );
+        let trampoline_addr = VirtAddress(trampoline_addr.0);
 
         let trampoline_addr_page = trampoline_addr.0 & !(PAGE_MASK as u64);
-        map_address_step(
+        map_address(
+            Some(pt_l4.as_page().as_paddr()),
             trampoline_addr,
-            pt_trampoline_l1.deref_mut(),
-            PhysMappingDest::Addr(trampoline_addr_page),
-            1,
+            PhysAddress(trampoline_addr_page),
+            // UEFI: identity mapping
+            |a| VirtAddress(a.0),
+            |a| PhysAddress(a.0),
             false,
-            false,
+            true,
             false,
         );
     }

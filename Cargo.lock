@@ -86,6 +86,7 @@ dependencies = [
  "log",
  "thiserror",
  "util",
+ "x86",
 ]
 
 [[package]]

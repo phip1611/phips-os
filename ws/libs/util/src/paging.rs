@@ -5,8 +5,20 @@ use {
         ONE_GIB,
         TWO_MIB,
     },
-    core::ops::RangeInclusive,
+    alloc::boxed::Box,
+    core::{
+        fmt::{
+            Display,
+            Formatter,
+        },
+        ops::{
+            Index,
+            IndexMut,
+            RangeInclusive,
+        },
+    },
     log::debug,
+    x86::controlregs::cr3,
 };
 
 pub const PAGE_SIZE: usize = 4096;
@@ -28,6 +40,12 @@ impl PhysAddress {}
 impl From<u64> for PhysAddress {
     fn from(value: u64) -> PhysAddress {
         Self(value)
+    }
+}
+
+impl Display for PhysAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:#x} (phys)", self.0)
     }
 }
 
@@ -53,6 +71,12 @@ impl VirtAddress {
 impl From<u64> for VirtAddress {
     fn from(value: u64) -> VirtAddress {
         Self(value)
+    }
+}
+
+impl Display for VirtAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:#x} (virt)", self.0)
     }
 }
 
@@ -83,7 +107,7 @@ impl PageTableEntry {
     pub const BITS_PHYS_ADDR: RangeInclusive<u64> = 12..=51;
     pub const BIT_EXECUTE_DISABLE: u64 = 1 << 63;
 
-    pub fn new(phys_addr: u64, flags: PageTableEntryFlags) -> Self {
+    pub fn new(addr: PhysAddress, flags: PageTableEntryFlags) -> Self {
         // Start with zero
         let mut value: u64 = 0;
 
@@ -106,10 +130,10 @@ impl PageTableEntry {
             value |= Self::BIT_HUGEPAGE;
         }
 
-        assert_eq!(phys_addr & PAGE_BITS_MASK as u64, 0);
-        assert_eq!(phys_addr & (!LIMIT_MAX_PHYS_BITS as u64), 0);
+        assert_eq!(addr.0 & PAGE_BITS_MASK as u64, 0);
+        assert_eq!(addr.0 & (!LIMIT_MAX_PHYS_BITS as u64), 0);
 
-        value |= phys_addr;
+        value |= addr.0;
 
         if flags.execute_disable {
             value |= Self::BIT_EXECUTE_DISABLE;
@@ -147,11 +171,12 @@ impl PageTableEntry {
         flags
     }
 
-    /// Returns the phys addr this is pointing to.
-    pub fn addr(&self) -> u64 /* phys addr */ {
+    /// Returns the physical address this is pointing to.
+    pub fn paddr(&self) -> PhysAddress {
         let len = Self::BITS_PHYS_ADDR.end() - Self::BITS_PHYS_ADDR.start();
         let mask = bit_ops::bitops_u64::create_mask(len);
-        mask << Self::BITS_PHYS_ADDR.start()
+        let mask = mask << Self::BITS_PHYS_ADDR.start();
+        PhysAddress(self.0 & mask)
     }
 }
 
@@ -162,6 +187,14 @@ pub struct Page(pub [u8; PAGE_SIZE]);
 
 impl Page {
     pub const ZERO: Self = Self([0; PAGE_SIZE]);
+
+    pub fn as_paddr(&self) -> PhysAddress {
+        PhysAddress(self.as_ptr() as u64)
+    }
+
+    pub fn as_vaddr(&self) -> VirtAddress {
+        VirtAddress(self.as_ptr() as u64)
+    }
 
     pub fn as_ptr(&self) -> *const u8 {
         let ptr = &raw const *self;
@@ -215,46 +248,17 @@ impl Default for PageTable {
     }
 }
 
-#[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-pub enum PhysMappingDest<'a> {
-    Page(&'a Page),
-    Ptr(*const u8),
-    PtrMut(*mut u8),
-    Addr(u64),
-}
+impl Index<usize> for PageTable {
+    type Output = PageTableEntry;
 
-impl<'a> From<&'a Page> for PhysMappingDest<'a> {
-    fn from(page: &'a Page) -> Self {
-        Self::Page(page)
+    fn index(&self, index: usize) -> &Self::Output {
+        self.0.index(index)
     }
 }
 
-impl From<*const u8> for PhysMappingDest<'_> {
-    fn from(ptr: *const u8) -> Self {
-        Self::Ptr(ptr)
-    }
-}
-
-impl From<*mut u8> for PhysMappingDest<'_> {
-    fn from(ptr: *mut u8) -> Self {
-        Self::PtrMut(ptr)
-    }
-}
-
-impl From<u64> for PhysMappingDest<'_> {
-    fn from(addr: u64) -> Self {
-        Self::Addr(addr)
-    }
-}
-
-impl PhysMappingDest<'_> {
-    pub fn to_addr(&self) -> u64 {
-        match self {
-            PhysMappingDest::Addr(addr) => *addr,
-            PhysMappingDest::Page(page) => page.as_ptr() as u64,
-            PhysMappingDest::Ptr(ptr) => *ptr as u64,
-            PhysMappingDest::PtrMut(ptr) => *ptr as u64,
-        }
+impl IndexMut<usize> for PageTable {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        self.0.index_mut(index)
     }
 }
 
@@ -266,9 +270,9 @@ impl PhysMappingDest<'_> {
 /// # Panics
 /// If some fundamental assumptions are broken, this function panics.
 pub fn map_address_step(
-    addr: VirtAddress,
+    vaddr: VirtAddress,
     phys_src: &mut PageTable,
-    phys_dest: PhysMappingDest<'_>,
+    phys_dest: PhysAddress,
     level: usize,
     write: bool,
     hugepage: bool,
@@ -277,14 +281,13 @@ pub fn map_address_step(
     if hugepage {
         assert!(level == 2 || level == 3);
         if level == 2 {
-            assert!(phys_dest.to_addr().is_multiple_of(TWO_MIB as u64));
+            assert!(phys_dest.0.is_multiple_of(TWO_MIB as u64));
         } else if level == 3 {
-            assert!(phys_dest.to_addr().is_multiple_of(ONE_GIB as u64));
+            assert!(phys_dest.0.is_multiple_of(ONE_GIB as u64));
         }
     }
 
-    let index = addr.index(level);
-    let phys_dest = phys_dest.to_addr();
+    let index = vaddr.index(level);
     let flags = PageTableEntryFlags {
         present: true,
         write,
@@ -295,14 +298,107 @@ pub fn map_address_step(
         execute_disable,
     };
     debug!(
-        "Mapping step: level={level}: table @ {:#x}#{:03} (phys) => {:#x} (phys)",
+        "Mapping step: level={level},rights=r{}{}: table @ {:#x}#{:03} => {}",
+        if flags.write { "w" } else { "-" },
+        if flags.execute_disable { "-" } else { "x" },
         phys_src.as_page().as_ptr() as u64,
         index,
-        phys_dest
+        phys_dest,
     );
-    debug!("  write={}, hugepage={}", flags.write, flags.hugepage);
     let entry = PageTableEntry::new(phys_dest, flags);
     phys_src.0[index] = entry;
+}
+
+/// Casts a virtual address as page table.
+unsafe fn addr_to_page_table(addr: u64) -> &'static mut PageTable {
+    let ptr = addr as *mut u8;
+    assert_eq!(ptr.align_offset(align_of::<PageTable>()), 0);
+    unsafe { ptr.cast::<PageTable>().as_mut().unwrap() }
+}
+
+/// Recursively maps the virtual address in the page table structure.
+///
+/// It either uses the existing page table structure or allocates new page
+/// tables from the heap as needed.
+///
+/// # Arguments
+/// - `root_page_table`: The root page table. Of `None`, the value of `cr3` is
+///   used.
+/// - `vaddr`: The virtual address to map.
+/// - `phys_dest`: The physical destination of the data we want to map.
+/// - `phys_to_virt`: Translates a [`PhysAddress`] to a [`VirtAddress`] that is
+///   reachable.
+/// - `virt_to_phys`: Translates a [`VirtAddress`] to the [`PhysAddress`].
+/// - `write`: Whether the mapping is writeable.
+/// - `execute`: Whether the mapping is executable.
+/// - `l2_hugepage`: Whether the mapping is a L2 huge page (2 MiB).
+pub fn map_address(
+    root_page_table: Option<PhysAddress>,
+    vaddr: VirtAddress,
+    phys_dest: PhysAddress,
+    phys_to_virt: impl Fn(PhysAddress) -> VirtAddress,
+    virt_to_phys: impl Fn(VirtAddress) -> PhysAddress,
+    write: bool,
+    execute: bool,
+    l2_hugepage: bool,
+) {
+    debug!("Recursively mapping vaddr {vaddr} to {phys_dest}");
+
+    let min_level = if l2_hugepage {
+        2 /* we map to a 2 MiB huge page */
+    } else {
+        1 /* we map to a 4k page */
+    };
+
+    // SAFETY: trivially safe.
+    let root = root_page_table.unwrap_or_else(|| PhysAddress(unsafe { cr3() }));
+    let page_table = phys_to_virt(root);
+
+    // Changed on each iteration to point to the current page table.
+    let mut current_page_table = unsafe { addr_to_page_table(page_table.0) };
+
+    // First, we just prepare the page table structure without the final entry.
+    for level in ((min_level + 1)..=4).rev() {
+        let index = vaddr.index(level);
+        let entry: PageTableEntry = current_page_table[index];
+        if !entry.flags().present {
+            let new_page_table = Box::new(PageTable::ZERO);
+            let new_page_table = Box::leak(new_page_table);
+            let new_page_table_vaddr = (&raw const *new_page_table) as u64;
+            let new_page_table_vaddr = VirtAddress(new_page_table_vaddr);
+            let new_page_table_paddr = virt_to_phys(new_page_table_vaddr);
+
+            map_address_step(
+                vaddr,
+                current_page_table,
+                new_page_table_paddr,
+                level,
+                true,
+                false,
+                false,
+            );
+
+            current_page_table = unsafe { addr_to_page_table(new_page_table_paddr.0) };
+        } else {
+            let entry = current_page_table[index];
+            let next_page_table_paddr = entry.paddr();
+            let next_page_table_vaddr = phys_to_virt(next_page_table_paddr);
+            let next_page_table = unsafe { addr_to_page_table(next_page_table_vaddr.0) };
+
+            current_page_table = next_page_table;
+        }
+    }
+
+    // Do the final mapping step. Only here, we restrict permissions.
+    map_address_step(
+        vaddr,
+        current_page_table,
+        phys_dest,
+        min_level,
+        write,
+        l2_hugepage,
+        !execute,
+    );
 }
 
 #[cfg(test)]

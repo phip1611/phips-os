@@ -16,3 +16,4 @@ elf = { workspace = true }
 util = { path = "../util" }
 thiserror = { workspace = true }
 log = { workspace = true }
+x86 = { workspace = true }

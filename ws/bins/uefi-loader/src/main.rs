@@ -27,10 +27,8 @@ mod panic_handler;
 static UEFI_BOOT_SERVICES_EXITED: AtomicBool = AtomicBool::new(false);
 
 use {
-    crate::config::Config,
     alloc::{
         boxed::Box,
-        string::String,
         vec::Vec,
     },
     anyhow::Context,
@@ -44,17 +42,18 @@ use {
     loader_lib::KernelFile,
     log::{
         debug,
-        error,
         info,
     },
     uefi::{
         CStr16,
-        Handle,
         cstr16,
         fs::FileSystem,
         mem::memory_map::MemoryMapOwned,
     },
-    util::paging::VirtAddress,
+    util::paging::{
+        PhysAddress,
+        VirtAddress,
+    },
 };
 
 /// The path on the boot volume where we expect the kernel file to be.
@@ -69,11 +68,6 @@ fn load_kernel_elf_from_disk() -> anyhow::Result<Box<[u8]>> {
         .read(KERNEL_PATH)
         .map_err(|e: uefi::fs::Error| anyhow::Error::new(e))?;
     Ok(bytes.into_boxed_slice())
-}
-
-struct PreExitBootServicesData {
-    kernel: Box<Vec<u8>>,
-    config: Config,
 }
 
 /// Trampoline in UEFI loader to jump to kernel.
@@ -129,7 +123,12 @@ fn main_inner() -> anyhow::Result<()> {
     let kernel = KernelFile::from_bytes(&file).context("should be valid kernel")?;
     let trampoline_addr = jump_to_kernel_trampoline as u64;
 
-    let new_cr3 = loader_lib::setup_page_tables(&kernel, trampoline_addr)?;
+    let new_cr3 = loader_lib::setup_page_tables(
+        &kernel,
+        VirtAddress(trampoline_addr),
+        VirtAddress(0 /* todo */),
+        |addr| PhysAddress(addr.0),
+    )?;
     let entry = kernel.entry();
     drop(kernel);
     drop(file);

@@ -39,7 +39,7 @@ default: build
 # BIN TARGETS
 
 .PHONY: build
-build: | kernel uefi-loader ARTIFACTS_DIR
+build: | check kernel uefi-loader ARTIFACTS_DIR
 	ln -f -s ../$(KERNEL_ARTIFACT) $(ARTIFACTS_DIR)/kernel.elf64
 	ln -f -s ../$(UEFI_LOADER_ARTIFACT) $(ARTIFACTS_DIR)
 	cargo run --bin kernel-elf-checker -- $(ARTIFACTS_DIR)/kernel.elf64 >/dev/null
@@ -64,7 +64,7 @@ uefi-loader:
 
 .PHONY: check
 check:
-	cargo check \
+	cargo check --all-targets --all-features \
 		-p kernel-lib \
 		-p loader-lib \
 		-p util
