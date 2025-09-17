@@ -41,6 +41,8 @@ pub unsafe extern "sysv64" fn kernel_entry() -> ! {
 
 fn main_inner() -> anyhow::Result<()> {
     logger::early_init();
+    heap::init();
+
     let mut data = core::hint::black_box([1, 2, 3, 4]);
     data[3] = 7;
     info!("Hello world from kernel: {:?}", data);

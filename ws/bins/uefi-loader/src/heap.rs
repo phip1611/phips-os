@@ -35,7 +35,7 @@ use {
 /// - the kernel's LOAD segments as 2 MiB mappings
 /// - the boot information
 /// - the page tables for loading the kernel
-const HEAP_SIZE: usize = 0x2000000;
+const HEAP_SIZE: usize = 0x4000000;
 
 #[global_allocator]
 static HEAP_ALLOCATOR: Allocator = Allocator::new();

@@ -1,30 +1,40 @@
 //! The heap (global Rust allocator) of the kernel.
+//!
+//! The heap is baked into the ELF and therefore easily usable before any
+//! parsing of the memory map.
+
+#![allow(static_mut_refs)]
 
 use {
+    alloc::vec,
     core::{
         alloc::{
             GlobalAlloc,
             Layout,
         },
         cell::OnceCell,
+        hint::black_box,
         ptr::NonNull,
     },
     spin::Mutex as SpinMutex,
     talc::{
         ErrOnOom,
+        Span,
         Talc,
+    },
+    util::paging::{
+        PAGE_SIZE,
+        Page,
     },
 };
 
-/*
-/// Heap size of 64 MiB.
-///
-/// This is enough to cover:
-/// - the kernel's LOAD segments as 2 MiB mappings
-/// - the boot information
-/// - the page tables for loading the kernel
+/// Heap size of 32 MiB.
 const HEAP_SIZE: usize = 0x2000000;
-*/
+
+/// Heap backing memory backed into the kernel ELF.
+#[used]
+static mut HEAP_MEM: [Page; HEAP_SIZE / PAGE_SIZE] = [Page::ZERO; HEAP_SIZE / PAGE_SIZE];
+
 #[global_allocator]
 static HEAP_ALLOCATOR: Allocator = Allocator::new();
 
@@ -61,5 +71,22 @@ unsafe impl GlobalAlloc for Allocator {
 
 /// Initializes the global allocator, i.e., the heap of the loader.
 pub fn init() {
-    todo!();
+    HEAP_ALLOCATOR.inner.lock().get_or_init(|| {
+        // SAFETY: We are protected by a lock and only do this once on valid
+        // memory.
+        let heap = unsafe { HEAP_MEM.as_mut_ptr() };
+
+        let mut talc = Talc::new(ErrOnOom);
+        let span = Span::from_base_size(heap.cast(), HEAP_SIZE);
+        unsafe {
+            talc.claim(span)
+                .expect("span {span} should be valid memory")
+        };
+        talc
+    });
+
+    log::debug!(
+        "initialized heap: allocations work: vec={:?}",
+        black_box(vec![1, 2, 3])
+    );
 }
