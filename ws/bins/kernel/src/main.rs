@@ -17,6 +17,8 @@
 extern crate alloc;
 
 use log::info;
+use kernel_lib::BootInformation;
+use util::paging::VirtAddress;
 
 mod heap;
 mod logger;
@@ -33,15 +35,20 @@ pub unsafe extern "sysv64" fn kernel_entry() -> ! {
     core::arch::naked_asm!(
         // Set up stack. Symbol comes from Rust.
         "mov (STACK_TOP), %rsp",
+        "mov %rdx, %rdi",
         "call main",
         "ud2",
         options(att_syntax)
     )
 }
 
-fn main_inner() -> anyhow::Result<()> {
+fn main_inner(boot_information: VirtAddress) -> anyhow::Result<()> {
     logger::early_init();
     heap::init();
+    let boot_information = unsafe {
+        (boot_information.0 as *const VirtAddress as *const BootInformation).as_ref().unwrap()
+    };
+    assert_eq!(boot_information.magic, BootInformation::MAGIC);
 
     let mut data = core::hint::black_box([1, 2, 3, 4]);
     data[3] = 7;
@@ -50,7 +57,7 @@ fn main_inner() -> anyhow::Result<()> {
 }
 
 #[unsafe(no_mangle)]
-fn main() -> ! {
-    main_inner().unwrap();
+fn main(boot_information: VirtAddress) -> ! {
+    main_inner(boot_information).unwrap();
     unreachable!("");
 }

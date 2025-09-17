@@ -102,7 +102,7 @@ fmt:
 
 .PHONY: test
 test:
-	cargo test \
+	cargo test --all-targets --all-features \
 		-p kernel-lib \
 		-p loader-lib \
 		-p util

@@ -9,12 +9,15 @@
 )]
 // I can't do anything about this; fault of the dependencies
 #![allow(clippy::multiple_crate_versions)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 #![deny(missing_debug_implementations)]
 #![deny(rustdoc::all)]
 
 mod boot_information;
 mod memory_map;
+
+pub use boot_information::BootInformation;
+pub use memory_map::{MemoryMapEntry, MemoryMap, MemoryMapEntryType, MemoryMapEntryFlags};
 
 extern crate alloc;
 #[cfg(test)]

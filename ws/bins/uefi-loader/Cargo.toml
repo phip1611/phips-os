@@ -18,5 +18,6 @@ serde_json = { workspace = true, features = ["alloc"] }
 spin = { workspace = true, features = ["spin_mutex"] }
 uefi = { workspace = true, features = ["alloc"] }
 loader-lib = { path = "../../libs/loader-lib"}
+kernel-lib = { path = "../../libs/kernel-lib"}
 util = { path = "../../libs/util" }
 talc = { workspace = true, features = ["lock_api"] }

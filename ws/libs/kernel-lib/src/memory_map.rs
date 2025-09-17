@@ -12,6 +12,7 @@ use {
         Unaligned,
     },
 };
+use util::paging::PhysAddress;
 
 type MemoryMapEntryFlagsRaw = u8;
 
@@ -90,7 +91,7 @@ impl TryFrom<MemoryMapEntryTypeRaw> for MemoryMapEntryType {
     Immutable,
 )]
 pub struct MemoryMapEntry {
-    from: u64, /* phys addr, incl. */
+    from: PhysAddress,
     length: u64,
     typ: MemoryMapEntryTypeRaw,
     prot: MemoryMapEntryFlagsRaw,
@@ -104,18 +105,18 @@ impl MemoryMapEntry {
     }
 
     /// Returns the includes begin of the memory map entry.
-    pub fn from(&self) -> u64 {
+    pub fn from(&self) -> PhysAddress {
         self.from
     }
 
-    /// Returns the lengh
+    /// Returns the length.
     pub fn length(&self) -> u64 {
         self.length
     }
 
     /// Returns the inclusive end of the memory map entry.
-    pub fn to(&self) -> u64 {
-        self.from + self.length
+    pub fn to(&self) -> PhysAddress {
+        PhysAddress(self.from.0 + self.length)
     }
 
     /// Returns the protection bits of the region.
@@ -132,7 +133,7 @@ impl MemoryMapEntry {
     /// lifetime.
     pub unsafe fn memory(
         &self,
-        phys_to_virt: impl Fn(u64) -> Option<VirtAddress>,
+        phys_to_virt: impl Fn(PhysAddress) -> Option<VirtAddress>,
     ) -> Option<&'static [u8]> {
         let from = phys_to_virt(self.from())?;
         let to = phys_to_virt(self.to())?;
@@ -151,7 +152,7 @@ impl MemoryMapEntry {
     /// lifetime.
     pub unsafe fn memory_mut(
         &self,
-        phys_to_virt: impl Fn(u64) -> Option<VirtAddress>,
+        phys_to_virt: impl Fn(PhysAddress) -> Option<VirtAddress>,
     ) -> Option<&'static mut [u8]> {
         let from = phys_to_virt(self.from())?;
         let to = phys_to_virt(self.to())?;
@@ -160,6 +161,16 @@ impl MemoryMapEntry {
         let slice = unsafe { slice::from_raw_parts_mut(from.0 as *mut u8, len as usize) };
         Some(slice)
     }
+}
+
+impl Default for MemoryMapEntry {
+    fn default() -> Self {Self {
+        from: PhysAddress(0),
+        length: 0,
+        typ: 0,
+        prot: 0,
+        _padding: [0; 6],
+    }}
 }
 
 #[repr(C)]
@@ -177,21 +188,21 @@ mod tests {
     fn test_to_and_from_bytes() {
         let entries = [
             MemoryMapEntry {
-                from: 0x1000,
+                from: 0x1000.into(),
                 length: 0x2000,
                 typ: MemoryMapEntryType::LoaderData.val(),
                 prot: (MemoryMapEntryFlags::READ | MemoryMapEntryFlags::WRITE).bits(),
                 _padding: [0; 6],
             },
             MemoryMapEntry {
-                from: 0x10000,
+                from: 0x10000.into(),
                 length: 0x20000,
                 typ: MemoryMapEntryType::AvailableRam.val(),
                 prot: 0,
                 _padding: [0; 6],
             },
             MemoryMapEntry {
-                from: 0x30000,
+                from: 0x30000.into(),
                 length: 0x40000,
                 typ: MemoryMapEntryType::Kernel.val(),
                 prot: MemoryMapEntryFlags::WRITE.bits(),

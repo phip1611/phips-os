@@ -1,5 +1,6 @@
 //! Module for x86_64 4-level paging.
 
+use zerocopy::{FromBytes, Immutable, IntoBytes};
 use {
     crate::sizes::{
         ONE_GIB,
@@ -31,7 +32,7 @@ const LEVEL_BITS_MASK: usize = bit_ops::bitops_usize::create_mask(LEVEL_BITS);
 const LIMIT_MAX_PHYS_BITS: usize = bit_ops::bitops_usize::create_mask(52);
 
 /// Wrapper around a `u64` marking this data as physical address.
-#[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, PartialOrd, Ord, Eq, PartialEq, Hash, FromBytes, IntoBytes, Immutable)]
 #[repr(transparent)]
 pub struct PhysAddress(pub u64);
 

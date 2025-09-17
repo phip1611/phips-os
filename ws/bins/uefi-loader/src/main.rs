@@ -55,6 +55,7 @@ use {
         VirtAddress,
     },
 };
+use kernel_lib::BootInformation;
 
 /// The path on the boot volume where we expect the kernel file to be.
 const KERNEL_PATH: &CStr16 = cstr16!("kernel.elf64");
@@ -90,8 +91,12 @@ fn load_kernel_elf_from_disk() -> anyhow::Result<Box<[u8]>> {
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 pub unsafe extern "sysv64" fn jump_to_kernel_trampoline(
+    // rdi
     new_cr3: u64,
+    // rsi
     kernel_addr: VirtAddress,
+    // rdx
+    boot_information: VirtAddress,
 ) -> ! {
     core::arch::naked_asm!(
         // align:
@@ -121,11 +126,13 @@ fn main_inner() -> anyhow::Result<()> {
         load_kernel_elf_from_disk().context("should be able to load kernel file from volume")?;
     let kernel = KernelFile::from_bytes(&file).context("should be valid kernel")?;
     let trampoline_addr = jump_to_kernel_trampoline as u64;
+    let boot_information = ManuallyDrop::new(Box::new(BootInformation::new("test commandline")));
+    let boot_information_vaddr =  &raw const boot_information as u64;
 
     let new_cr3 = loader_lib::setup_page_tables(
         &kernel,
         VirtAddress(trampoline_addr),
-        VirtAddress(0 /* todo */),
+        VirtAddress(boot_information_vaddr),
         |addr| PhysAddress(addr.0),
     )?;
     let entry = kernel.entry();
@@ -143,7 +150,7 @@ fn main_inner() -> anyhow::Result<()> {
     debug!("  new cr3     : {:#x}", new_cr3);
     debug!("  kernel entry: {:#x}", entry.0);
     unsafe {
-        jump_to_kernel_trampoline(new_cr3, entry);
+        jump_to_kernel_trampoline(new_cr3, entry, VirtAddress(boot_information_vaddr));
     }
 }
 

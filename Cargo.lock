@@ -298,6 +298,7 @@ name = "uefi-loader"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "kernel-lib",
  "loader-lib",
  "log",
  "serde",
