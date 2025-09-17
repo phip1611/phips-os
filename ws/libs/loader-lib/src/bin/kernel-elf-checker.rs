@@ -11,7 +11,7 @@ use {
         fs,
         io::{
             self,
-            stdout,
+            stderr,
         },
     },
     util::logging::fmt_and_write_msg,
@@ -40,9 +40,10 @@ impl Log for Logger {
     }
 
     fn log(&self, record: &Record) {
-        let stdout = stdout();
-        let mut stdout = IoToFmt(stdout);
-        fmt_and_write_msg(&mut stdout, record).unwrap();
+        let stderr = stderr();
+        let mut stderr = IoToFmt(stderr);
+        fmt_and_write_msg(&mut stderr, record).unwrap();
+        eprintln!();
     }
 
     fn flush(&self) {}
